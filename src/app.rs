@@ -244,6 +244,7 @@ impl App {
             Mode::Editing => {
                 match key.code {
                     KeyCode::Esc => {}
+                    KeyCode::Tab => self.sidebar_focus = false,
                     KeyCode::Enter => {
                         if self.section == Section::Search {
                             self.schedule_search(true);
@@ -595,6 +596,63 @@ mod tests {
         assert_eq!(app.section, Section::Search);
         assert!(app.library.favorites.is_empty());
     }
+    #[test]
+    fn tab_leaves_search_input_and_focuses_results_without_resubmitting() {
+        let mut app = App::new(Config::default(), Library::default());
+        app.section = Section::Search;
+        let station = Station::custom(
+            url::Url::parse("https://example.com/live").unwrap(),
+            "Jazz",
+            None,
+        );
+        app.results = vec![station.clone(), station];
+        app.key(key('/'));
+        for c in "jazz".chars() {
+            app.key(key(c));
+        }
+        let generation = app.search_generation;
+        let due = app.search_due;
+
+        assert!(
+            app.key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE))
+                .is_empty()
+        );
+        assert!(matches!(app.mode, Mode::Normal));
+        assert!(!app.sidebar_focus);
+        assert_eq!(app.query, "jazz");
+        assert_eq!(app.search_generation, generation);
+        assert_eq!(app.search_due, due);
+        assert!(app.searching);
+
+        // Navigation now operates on rows, not the query or sidebar.
+        app.key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+        assert_eq!(app.tables[2].selected(), Some(1));
+        assert_eq!(app.query, "jazz");
+        assert!(matches!(
+            app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))
+                .as_slice(),
+            [Effect::Play(_)]
+        ));
+    }
+
+    #[test]
+    fn tab_leaves_an_empty_search_field_without_playing() {
+        let mut app = App::new(Config::default(), Library::default());
+        app.section = Section::Search;
+        app.key(key('/'));
+        assert!(
+            app.key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE))
+                .is_empty()
+        );
+        assert!(matches!(app.mode, Mode::Normal));
+        assert!(!app.sidebar_focus);
+        assert!(app.query.is_empty());
+        assert!(
+            app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))
+                .is_empty()
+        );
+    }
+
     #[test]
     fn stale_search_and_import_results_are_ignored() {
         let mut app = App::new(Config::default(), Library::default());

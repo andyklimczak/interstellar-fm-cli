@@ -253,7 +253,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Mode::Help => {
             let area = popup(frame, 78, 34, " Controls · j/k scroll · Esc close ", color);
             let mut help = app.keymap.help();
-            help.push("Text fields: Enter finish · Esc cancel/leave · Ctrl-u clear".into());
+            help.push(
+                "Search/filter: Tab to results · Enter submit · Esc leave · Ctrl-u clear".into(),
+            );
             help.push("Import preview: Space select · a all · Enter save · p save/play".into());
             frame.render_widget(
                 Paragraph::new(help.join("\n"))

@@ -112,6 +112,7 @@ These are inspired by SubTUI, with a few radio-specific additions. Bindings appl
 Input rules:
 
 - Text-editing mode consumes printable keys, including `q`, `f`, `p`, spaces, and digits; typing must never trigger playback or quit.
+- `Tab` in a search/filter field focuses the results/station list, preserving the query and pending debounce without submitting again or playing a station.
 - `Enter` in a search field submits immediately and focuses results; it does not immediately play a result.
 - `Esc` leaves text editing without discarding the query. Clearing the query restores popular stations.
 - `Ctrl-c` always exits through the cleanup path.

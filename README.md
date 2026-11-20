@@ -58,7 +58,7 @@ Run the UI in a real interactive terminal, at least 36 columns × 18 rows. It do
 | Help (scroll with `j` / `k`) | `?` |
 | Quit | `q` or `Ctrl-c` |
 
-Search runs after two characters with a 350 ms debounce. An empty/one-character search shows popular stations. Sort by name, popularity, votes, or bitrate. `Enter` finishes text entry and focuses results; press it again to play. `Esc` leaves text entry without clearing it, `Ctrl-u` clears the field, and Backspace edits. Input currently edits at the end of the field. Bracketed paste is supported. Printable characters such as `q`, `p`, and spaces are always text while a field is active.
+Search runs after two characters with a 350 ms debounce. An empty/one-character search shows popular stations. Sort by name, popularity, votes, or bitrate. `Tab` leaves the search/filter input and focuses the station list, preserving the query and any pending search. `Enter` submits the search immediately and focuses results; press it again to play. `Esc` leaves text entry without clearing it, `Ctrl-u` clears the field, and Backspace edits. Input currently edits at the end of the field. Bracketed paste is supported. Printable characters such as `q`, `p`, and spaces are always text while a field is active.
 
 Saved is your favorites library. Removing a favorite does **not** stop the stream or delete its History entry. History contains the last 30 distinct stations by default and only updates once playback starts successfully. You can favorite a removed custom station again from History.
 
