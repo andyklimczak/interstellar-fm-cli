@@ -1,5 +1,11 @@
 # Interstellar FM CLI — implementation plan
 
+## Implementation status
+
+The first usable Rust implementation is now in `src/`; see `README.md` for launch instructions and current controls. Core Saved/History/Search, Radio Browser discovery/search, mpv playback/reconnects, persistence, favorite removal, direct streams, local/remote PLS imports, keybinding configuration, and responsive layouts are implemented. Automated tests and an opt-in real-mpv pseudo-terminal smoke test are included.
+
+Two intentional changes from the architecture below: favorites/history/settings use one atomic `library.json` snapshot instead of split storage files, and each station change starts a fresh owned mpv session instead of reusing a long-lived child. These simplify consistent persistence and stale playback-event isolation. Persistent discovery/popular caches, richer text-field editing, extensive codec/platform testing, and release packaging remain follow-ups. The sections below retain the original roadmap for reference, not a claim that every hardening item is complete.
+
 ## Goal
 
 Build a keyboard-first Rust terminal radio player that feels like the terminal counterpart of `~/Dev/interstellar-fm`, with three primary sections: **Saved**, **History**, and **Search**. Keep playback visible and running while navigating between sections.

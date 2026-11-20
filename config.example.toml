@@ -1,0 +1,30 @@
+# Copy to ~/.config/interstellarfm-cli/config.toml (or use --config PATH).
+# Every setting is optional.
+mpv_path = "mpv"
+history_limit = 30
+debounce_ms = 350
+accent = "magenta" # magenta, cyan, green, blue, yellow, red
+
+# Optional HTTPS API override; disables automatic mirror discovery/fallback.
+# api_base = "https://de1.api.radio-browser.info"
+
+# Override navigation shortcuts. Unspecified actions keep their defaults.
+# Modal dialog/text-entry shortcuts are fixed so typing never triggers actions.
+# An empty list disables an action's navigation shortcuts.
+# Bindings must be unique; free a key in its old action before assigning it.
+[keybindings]
+# favorite = ["x"]
+# volume_up = ["+", "v"]
+# volume_down = ["-", "V"]
+# pause = ["space", "p"]
+# add = ["a"]
+# remove = ["d", "delete"]
+# quit = ["q"]
+
+# Available actions:
+# saved, history, search, focus, up, down, top, bottom, page_up, page_down,
+# half_page_up, half_page_down, play, favorite, add, remove, pause, stop,
+# volume_up, volume_down, mute, filter, sort, reverse, refresh, details, help, quit
+# Keys: a single case-sensitive character; ctrl+x; enter, space, tab,
+# shift+tab, up, down, left, right, home, end, pageup, pagedown, delete, backspace.
+# gg (first row) and Ctrl-c (quit) are always available and cannot be rebound.
