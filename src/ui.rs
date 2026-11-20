@@ -12,7 +12,43 @@ use ratatui::{
     },
 };
 
+/// Compact table counts: one decimal below 10 units, otherwise whole units.
 fn count(value: Option<u64>) -> String {
+    let Some(value) = value else {
+        return "—".into();
+    };
+    if value < 1_000 {
+        return value.to_string();
+    }
+    let units = [
+        (1_000_u64, "k"),
+        (1_000_000, "m"),
+        (1_000_000_000, "b"),
+        (1_000_000_000_000, "t"),
+    ];
+    let mut index = units
+        .iter()
+        .rposition(|(scale, _)| value >= *scale)
+        .unwrap();
+    let rounded = |scale: u64| (u128::from(value) + u128::from(scale) / 2) / u128::from(scale);
+    // Promote rounded values at boundaries: 999,999 is 1m, not 1000k.
+    if rounded(units[index].0) >= 1_000 && index + 1 < units.len() {
+        index += 1;
+    }
+    let (scale, suffix) = units[index];
+    if u128::from(value) < u128::from(scale) * 10 {
+        let tenths = (u128::from(value) * 10 + u128::from(scale) / 2) / u128::from(scale);
+        if tenths.is_multiple_of(10) {
+            format!("{}{suffix}", tenths / 10)
+        } else {
+            format!("{}.{:01}{suffix}", tenths / 10, tenths % 10)
+        }
+    } else {
+        format!("{}{suffix}", rounded(scale))
+    }
+}
+
+fn exact_count(value: Option<u64>) -> String {
     let Some(value) = value else {
         return "—".into();
     };
@@ -168,10 +204,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         widths.push(Constraint::Length(17));
     }
     headers.push(right("Votes".into()));
-    widths.push(Constraint::Length(10));
+    widths.push(Constraint::Length(7));
     if main.width >= 60 {
         headers.push(right("Clicks".into()));
-        widths.push(Constraint::Length(11));
+        widths.push(Constraint::Length(7));
     }
     let title = if app.section == Section::Search && app.query.trim().chars().count() < 2 {
         " Discover stations "
@@ -293,8 +329,8 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                 source,
                 s.country,
                 s.language,
-                count(s.votes),
-                count(s.clicks),
+                exact_count(s.votes),
+                exact_count(s.clicks),
                 s.codec,
                 s.bitrate,
                 s.tags,
@@ -422,11 +458,36 @@ mod tests {
     }
 
     #[test]
-    fn counts_distinguish_unknown_from_zero_and_group_digits() {
+    fn counts_are_compact_and_handle_rounding_boundaries() {
         assert_eq!(count(None), "—");
-        assert_eq!(count(Some(0)), "0");
-        assert_eq!(count(Some(12345)), "12,345");
-        assert_eq!(count(Some(1234567890)), "1,234,567,890");
+        for (value, expected) in [
+            (0, "0"),
+            (999, "999"),
+            (1_000, "1k"),
+            (1_049, "1k"),
+            (1_050, "1.1k"),
+            (2_300, "2.3k"),
+            (9_999, "10k"),
+            (23_059, "23k"),
+            (67_890, "68k"),
+            (999_499, "999k"),
+            (999_500, "1m"),
+            (1_234_567, "1.2m"),
+            (23_059_000, "23m"),
+            (1_234_567_890, "1.2b"),
+            (1_000_000_000_000, "1t"),
+        ] {
+            assert_eq!(count(Some(value)), expected, "count for {value}");
+        }
+        assert!(!count(Some(u64::MAX)).is_empty());
+    }
+
+    #[test]
+    fn details_keep_exact_counts() {
+        assert_eq!(exact_count(None), "—");
+        assert_eq!(exact_count(Some(0)), "0");
+        assert_eq!(exact_count(Some(23_059)), "23,059");
+        assert_eq!(exact_count(Some(1_234_567_890)), "1,234,567,890");
     }
 
     #[test]
@@ -448,13 +509,13 @@ mod tests {
         for width in [120, 60, 36] {
             let text = screen(&mut app, width);
             assert!(text.contains("Votes"));
-            assert!(text.contains("12,345"));
+            assert!(text.contains("12k"));
             assert!(!text.contains("Codec"));
             assert!(!text.contains("AAC"));
             assert!(!text.contains("kbps"));
             if width >= 60 {
                 assert!(text.contains("Clicks"));
-                assert!(text.contains("67,890"));
+                assert!(text.contains("68k"));
             } else {
                 assert!(!text.contains("Clicks"));
             }
@@ -463,6 +524,8 @@ mod tests {
         let details = screen(&mut app, 120);
         assert!(details.contains("AAC"));
         assert!(details.contains("128 kbps"));
+        assert!(details.contains("12,345"));
+        assert!(details.contains("67,890"));
     }
 
     #[test]

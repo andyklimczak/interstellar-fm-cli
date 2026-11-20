@@ -58,8 +58,8 @@ Use a small navigation sidebar and a large station table, rather than three simu
 │ Saved (12) │ Search: jazz                     Sort: Votes      │
 │ History    ├──────────────────────────────────────────────────┤
 │ Search     │   Station              Country   Votes   Clicks  │
-│            │ > ★ Jazz Radio         France    12,345  67,890  │
-│            │     Jazz24             USA        4,321  23,456  │
+│            │ > ★ Jazz Radio         France       12k     68k  │
+│            │     Jazz24             USA         4.3k     23k  │
 │            │                                                  │
 ├────────────┴──────────────────────────────────────────────────┤
 │ PLAYING  Jazz Radio · Artist — Track, when available           │
@@ -70,7 +70,7 @@ Use a small navigation sidebar and a large station table, rather than three simu
 ```
 
 - Sidebar: Saved / History / Search, with counts where useful.
-- Main pane: table with saved marker, station name, country, Votes, and Clicks. Show right-aligned counts with thousands separators; keep Votes on narrow terminals and hide Clicks/country when needed. Codec/bitrate stay in station details. Unknown counts (custom streams and legacy snapshots) display as `—`, not zero. Counts persist in saved/History snapshots and update when directory responses provide fresh values. Add last-played time in History when space allows.
+- Main pane: table with saved marker, station name, country, Votes, and Clicks. Show right-aligned compact counts (`23k`, `2.3k`, `1.2m`), keeping exact counts with thousands separators in station details; keep Votes on narrow terminals and hide Clicks/country when needed. Codec/bitrate stay in station details. Unknown counts (custom streams and legacy snapshots) display as `—`, not zero. Counts persist in saved/History snapshots and update when directory responses provide fresh values. Add last-played time in History when space allows.
 - Distinguish the selected row from the currently playing station.
 - Preserve each section's selection and scroll position independently.
 - Search input and sort controls appear in Search; Saved/History can have a local filter instead.
