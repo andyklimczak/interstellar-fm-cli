@@ -22,6 +22,10 @@ pub struct Station {
     #[serde(default)]
     pub bitrate: u32,
     #[serde(default)]
+    pub votes: Option<u64>,
+    #[serde(default)]
+    pub clicks: Option<u64>,
+    #[serde(default)]
     pub tags: String,
     #[serde(default)]
     pub language: String,
@@ -45,11 +49,28 @@ impl Station {
             country: String::new(),
             codec: String::new(),
             bitrate: 0,
+            votes: None,
+            clicks: None,
             tags: String::new(),
             language: String::new(),
             homepage: String::new(),
             playlist_source: source,
         }
+    }
+
+    /// Keep directory statistics current without changing saved names or identity.
+    pub fn update_counts_from(&mut self, station: &Self) -> bool {
+        if self.id != station.id {
+            return false;
+        }
+        let previous = (self.votes, self.clicks);
+        if station.votes.is_some() {
+            self.votes = station.votes;
+        }
+        if station.clicks.is_some() {
+            self.clicks = station.clicks;
+        }
+        previous != (self.votes, self.clicks)
     }
 }
 
@@ -203,6 +224,35 @@ mod tests {
             "https://example.com/?key=2"
         ));
     }
+    #[test]
+    fn legacy_and_custom_stations_have_unknown_counts() {
+        let station = station("live");
+        assert_eq!((station.votes, station.clicks), (None, None));
+        let mut value = serde_json::to_value(&station).unwrap();
+        let object = value.as_object_mut().unwrap();
+        object.remove("votes");
+        object.remove("clicks");
+        let loaded: Station = serde_json::from_value(value).unwrap();
+        assert_eq!((loaded.votes, loaded.clicks), (None, None));
+    }
+
+    #[test]
+    fn count_updates_preserve_identity_name_and_known_values() {
+        let mut saved = station("live");
+        let mut fresh = saved.clone();
+        fresh.name = "Updated directory name".into();
+        fresh.votes = Some(0);
+        fresh.clicks = Some(12345);
+        assert!(saved.update_counts_from(&fresh));
+        assert_eq!(saved.name, "live");
+        assert_eq!((saved.votes, saved.clicks), (Some(0), Some(12345)));
+        assert!(!saved.update_counts_from(&station("other")));
+        fresh.votes = None;
+        fresh.clicks = None;
+        assert!(!saved.update_counts_from(&fresh));
+        assert_eq!((saved.votes, saved.clicks), (Some(0), Some(12345)));
+    }
+
     #[test]
     fn strips_terminal_escapes() {
         assert_eq!(clean("\x1b[31mRadio\x1b[0m\n\x07"), "Radio");

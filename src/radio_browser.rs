@@ -249,6 +249,8 @@ struct RadioStation {
     country: Option<String>,
     codec: Option<String>,
     bitrate: Option<u32>,
+    votes: Option<u64>,
+    clickcount: Option<u64>,
     tags: Option<String>,
     language: Option<String>,
     homepage: Option<String>,
@@ -268,6 +270,8 @@ impl RadioStation {
             country: self.country.unwrap_or_default(),
             codec: self.codec.unwrap_or_default(),
             bitrate: self.bitrate.unwrap_or_default(),
+            votes: self.votes,
+            clicks: self.clickcount,
             tags: self.tags.unwrap_or_default(),
             language: self.language.unwrap_or_default(),
             homepage: self.homepage.unwrap_or_default(),
@@ -373,6 +377,25 @@ mod tests {
         let s = dto.normalize().unwrap();
         assert_eq!(s.url, "http://example.com/live");
         assert_eq!(s.bitrate, 0);
+        assert_eq!((s.votes, s.clicks), (None, None));
+    }
+
+    #[test]
+    fn normalizes_votes_and_clicks_without_confusing_missing_with_zero() {
+        let station = |counts: &str| {
+            serde_json::from_str::<RadioStation>(&format!(
+                r#"{{"stationuuid":"abc","url":"https://example.com/live",{counts}}}"#
+            ))
+            .unwrap()
+            .normalize()
+            .unwrap()
+        };
+        let known = station(r#""votes":12345,"clickcount":67890"#);
+        assert_eq!((known.votes, known.clicks), (Some(12345), Some(67890)));
+        let zero = station(r#""votes":0,"clickcount":0"#);
+        assert_eq!((zero.votes, zero.clicks), (Some(0), Some(0)));
+        let unknown = station(r#""votes":null,"clickcount":null"#);
+        assert_eq!((unknown.votes, unknown.clicks), (None, None));
     }
     #[tokio::test]
     async fn search_encodes_query_and_filters_broken_duplicates() {

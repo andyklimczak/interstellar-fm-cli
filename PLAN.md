@@ -57,9 +57,9 @@ Use a small navigation sidebar and a large station table, rather than three simu
 ┌ Interstellar FM ──────────────────────────────────────────────┐
 │ Saved (12) │ Search: jazz                     Sort: Votes      │
 │ History    ├──────────────────────────────────────────────────┤
-│ Search     │   Station              Country   Codec   kbps    │
-│            │ > ★ Jazz Radio         France    MP3     128     │
-│            │     Jazz24             USA       AAC      64     │
+│ Search     │   Station              Country   Votes   Clicks  │
+│            │ > ★ Jazz Radio         France    12,345  67,890  │
+│            │     Jazz24             USA        4,321  23,456  │
 │            │                                                  │
 ├────────────┴──────────────────────────────────────────────────┤
 │ PLAYING  Jazz Radio · Artist — Track, when available           │
@@ -70,13 +70,13 @@ Use a small navigation sidebar and a large station table, rather than three simu
 ```
 
 - Sidebar: Saved / History / Search, with counts where useful.
-- Main pane: table with saved marker, station name, country, codec, and bitrate. Add last-played time in History when space allows.
+- Main pane: table with saved marker, station name, country, Votes, and Clicks. Show right-aligned counts with thousands separators; keep Votes on narrow terminals and hide Clicks/country when needed. Codec/bitrate stay in station details. Unknown counts (custom streams and legacy snapshots) display as `—`, not zero. Counts persist in saved/History snapshots and update when directory responses provide fresh values. Add last-played time in History when space allows.
 - Distinguish the selected row from the currently playing station.
 - Preserve each section's selection and scroll position independently.
 - Search input and sort controls appear in Search; Saved/History can have a local filter instead.
 - Bottom player: station, playback/buffering/error state, available ICY metadata, live indicator, volume, and mute state. Do not show a misleading track progress bar.
 - Context-sensitive footer and a help overlay generated from the active keymap.
-- Station details popup: country, language, tags, homepage, codec, bitrate, and stream URL.
+- Station details popup: country, language, votes/clicks, tags, homepage, codec, bitrate, and stream URL.
 - At narrow widths, replace the sidebar with top tabs and drop lower-priority columns. At very small sizes, show a resize message without panicking.
 - Loading, empty, offline, and error states should explain what happened and how to retry.
 - Dark terminal-friendly defaults, configurable accents, and an ASCII fallback; no required Nerd Font or image protocol.

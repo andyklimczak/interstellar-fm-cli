@@ -191,6 +191,17 @@ impl App {
         self.loaded = true;
         match result {
             Ok(stations) => {
+                for station in &stations {
+                    for saved in &mut self.library.favorites {
+                        self.dirty |= saved.update_counts_from(station);
+                    }
+                    for entry in &mut self.library.history {
+                        self.dirty |= entry.station.update_counts_from(station);
+                    }
+                    if let Some(current) = &mut self.current {
+                        current.update_counts_from(station);
+                    }
+                }
                 self.results = stations;
                 self.tables[2].select(Some(0));
                 self.message = format!("{} stations · Enter play · f favorite", self.results.len());
@@ -597,6 +608,34 @@ mod tests {
         }
         assert!(matches!(app.key(key('O')).as_slice(), [Effect::Search]));
         assert!(app.reversed);
+    }
+
+    #[test]
+    fn search_refreshes_saved_and_history_counts_without_changing_names() {
+        let mut app = App::new(Config::default(), Library::default());
+        let mut station = Station::custom(
+            url::Url::parse("https://example.com/live").unwrap(),
+            "My favorite",
+            None,
+        );
+        station.id = crate::model::StationId::RadioBrowser("abc".into());
+        app.library.add(station.clone());
+        app.library.record(station.clone(), 30);
+        app.current = Some(station.clone());
+        station.name = "Directory name".into();
+        station.votes = Some(123);
+        station.clicks = Some(456);
+        app.search_result(0, Ok(vec![station]));
+        assert!(app.dirty);
+        for saved in [
+            &app.library.favorites[0],
+            &app.library.history[0].station,
+            app.current.as_ref().unwrap(),
+        ] {
+            assert_eq!((saved.votes, saved.clicks), (Some(123), Some(456)));
+            assert_eq!(saved.name, "My favorite");
+        }
+        assert_eq!(app.library.history.len(), 1);
     }
 
     #[test]

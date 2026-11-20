@@ -4,13 +4,32 @@ use crate::{
 };
 use ratatui::{
     Frame,
-    layout::{Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{
-        Block, Borders, Clear, List, ListItem, ListState, Paragraph, Row, Table, Tabs, Wrap,
+        Block, Borders, Cell, Clear, List, ListItem, ListState, Paragraph, Row, Table, Tabs, Wrap,
     },
 };
+
+fn count(value: Option<u64>) -> String {
+    let Some(value) = value else {
+        return "—".into();
+    };
+    let digits = value.to_string();
+    let mut formatted = String::new();
+    for (i, digit) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            formatted.push(',');
+        }
+        formatted.push(digit);
+    }
+    formatted
+}
+
+fn right(text: String) -> Cell<'static> {
+    Cell::from(Line::from(text).alignment(Alignment::Right))
+}
 
 fn accent(app: &App) -> Color {
     match app.config.accent.as_str() {
@@ -127,17 +146,13 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                 if playing { ">" } else { " " },
                 if app.library.is_saved(s) { "*" } else { " " }
             );
-            let mut cells = vec![mark, clean(&s.name)];
+            let mut cells = vec![Cell::from(mark), Cell::from(clean(&s.name))];
             if main.width >= 70 {
-                cells.push(clean(&s.country));
-                cells.push(clean(&s.codec));
+                cells.push(Cell::from(clean(&s.country)));
             }
-            if main.width >= 50 {
-                cells.push(if s.bitrate == 0 {
-                    "—".into()
-                } else {
-                    s.bitrate.to_string()
-                });
+            cells.push(right(count(s.votes)));
+            if main.width >= 60 {
+                cells.push(right(count(s.clicks)));
             }
             Row::new(cells).style(if playing {
                 Style::default().fg(Color::Green)
@@ -146,15 +161,17 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             })
         })
         .collect();
-    let mut headers = vec!["", "Station"];
+    let mut headers = vec![Cell::from(""), Cell::from("Station")];
     let mut widths = vec![Constraint::Length(2), Constraint::Min(10)];
     if main.width >= 70 {
-        headers.extend(["Country", "Codec"]);
-        widths.extend([Constraint::Length(17), Constraint::Length(7)]);
+        headers.push(Cell::from("Country"));
+        widths.push(Constraint::Length(17));
     }
-    if main.width >= 50 {
-        headers.push("kbps");
-        widths.push(Constraint::Length(5));
+    headers.push(right("Votes".into()));
+    widths.push(Constraint::Length(10));
+    if main.width >= 60 {
+        headers.push(right("Clicks".into()));
+        widths.push(Constraint::Length(11));
     }
     let title = if app.section == Section::Search && app.query.trim().chars().count() < 2 {
         " Discover stations "
@@ -270,7 +287,25 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                 crate::model::StationId::Custom(_) => "Custom stream",
                 _ => "Radio Browser",
             };
-            frame.render_widget(Paragraph::new(clean(&format!("{}\n{}\n\nCountry: {}\nLanguage: {}\nCodec: {} · {} kbps\nTags: {}\nHomepage: {}\nStream: {}\nPlaylist: {}", s.name, source, s.country, s.language, s.codec, s.bitrate, s.tags, s.homepage, s.url, s.playlist_source.as_deref().unwrap_or("—")))).wrap(Wrap { trim: true }), area);
+            let details = format!(
+                "{}\n{}\n\nCountry: {}\nLanguage: {}\nVotes: {} · Clicks: {}\nCodec: {} · {} kbps\nTags: {}\nHomepage: {}\nStream: {}\nPlaylist: {}",
+                s.name,
+                source,
+                s.country,
+                s.language,
+                count(s.votes),
+                count(s.clicks),
+                s.codec,
+                s.bitrate,
+                s.tags,
+                s.homepage,
+                s.url,
+                s.playlist_source.as_deref().unwrap_or("—")
+            );
+            frame.render_widget(
+                Paragraph::new(clean(&details)).wrap(Wrap { trim: true }),
+                area,
+            );
         }
         Mode::Confirm(s) => {
             let area = popup(frame, 65, 7, " Remove favorite ", color);
@@ -374,6 +409,79 @@ fn input(frame: &mut Frame, area: Rect, title: &str, value: &str, focused: bool,
 mod tests {
     use super::*;
     use ratatui::{Terminal, backend::TestBackend};
+    fn screen(app: &mut App, width: u16) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(width, 35)).unwrap();
+        terminal.draw(|frame| draw(frame, app)).unwrap();
+        terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect()
+    }
+
+    #[test]
+    fn counts_distinguish_unknown_from_zero_and_group_digits() {
+        assert_eq!(count(None), "—");
+        assert_eq!(count(Some(0)), "0");
+        assert_eq!(count(Some(12345)), "12,345");
+        assert_eq!(count(Some(1234567890)), "1,234,567,890");
+    }
+
+    #[test]
+    fn table_shows_votes_and_clicks_instead_of_technical_columns() {
+        let mut app = App::new(
+            crate::config::Config::default(),
+            crate::model::Library::default(),
+        );
+        let mut station = crate::model::Station::custom(
+            url::Url::parse("https://example.com/live").unwrap(),
+            "Jazz radio",
+            None,
+        );
+        station.votes = Some(12345);
+        station.clicks = Some(67890);
+        station.codec = "AAC".into();
+        station.bitrate = 128;
+        app.library.add(station.clone());
+        for width in [120, 60, 36] {
+            let text = screen(&mut app, width);
+            assert!(text.contains("Votes"));
+            assert!(text.contains("12,345"));
+            assert!(!text.contains("Codec"));
+            assert!(!text.contains("AAC"));
+            assert!(!text.contains("kbps"));
+            if width >= 60 {
+                assert!(text.contains("Clicks"));
+                assert!(text.contains("67,890"));
+            } else {
+                assert!(!text.contains("Clicks"));
+            }
+        }
+        app.mode = Mode::Details(station);
+        let details = screen(&mut app, 120);
+        assert!(details.contains("AAC"));
+        assert!(details.contains("128 kbps"));
+    }
+
+    #[test]
+    fn custom_streams_show_unknown_counts_instead_of_zero() {
+        let mut app = App::new(
+            crate::config::Config::default(),
+            crate::model::Library::default(),
+        );
+        app.library.add(crate::model::Station::custom(
+            url::Url::parse("https://example.com/live").unwrap(),
+            "My stream",
+            None,
+        ));
+        let text = screen(&mut app, 120);
+        assert!(text.contains("Votes"));
+        assert!(text.contains("Clicks"));
+        assert_eq!(text.matches('—').count(), 2);
+    }
+
     #[test]
     fn header_displays_the_universe_tagline() {
         let mut app = App::new(

@@ -96,6 +96,36 @@ mod tests {
         assert!(Storage::open(dir.path()).is_ok());
     }
     #[test]
+    fn vote_and_click_snapshots_survive_restarts() {
+        let dir = tempfile::tempdir().unwrap();
+        let storage = Storage::open(dir.path()).unwrap();
+        let mut station = crate::model::Station::custom(
+            url::Url::parse("https://example.com/live").unwrap(),
+            "Radio",
+            None,
+        );
+        station.votes = Some(12345);
+        station.clicks = Some(67890);
+        let mut library = Library::default();
+        library.add(station.clone());
+        library.record(station, 30);
+        storage.save(&library).unwrap();
+        drop(storage);
+        let library = Storage::open(dir.path()).unwrap().load(30).unwrap();
+        assert_eq!(
+            (library.favorites[0].votes, library.favorites[0].clicks),
+            (Some(12345), Some(67890))
+        );
+        assert_eq!(
+            (
+                library.history[0].station.votes,
+                library.history[0].station.clicks
+            ),
+            (Some(12345), Some(67890))
+        );
+    }
+
+    #[test]
     fn corrupt_files_are_preserved() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("library.json"), b"broken").unwrap();

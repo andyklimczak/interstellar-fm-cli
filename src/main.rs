@@ -53,7 +53,7 @@ struct Args {
 enum WorkerEvent {
     Search(u64, Result<Vec<Station>, String>),
     Import(u64, Result<Vec<Station>, String>),
-    Refreshed(u64, Option<Station>),
+    Refreshed(u64, Option<Box<Station>>),
     StorageError(String),
 }
 
@@ -238,7 +238,7 @@ impl Engine {
                         let radio = self.radio.clone();
                         let tx = self.workers.clone();
                         self.refresh_task = Some(tokio::spawn(async move {
-                            let station = radio.refresh(&id).await.ok();
+                            let station = radio.refresh(&id).await.ok().map(Box::new);
                             let _ = tx.send(WorkerEvent::Refreshed(generation, station)).await;
                         }));
                     } else {
@@ -260,16 +260,18 @@ impl Engine {
                     for saved in &mut app.library.favorites {
                         if saved.id == station.id {
                             saved.url = station.url.clone();
+                            saved.update_counts_from(&station);
                             app.dirty = true;
                         }
                     }
                     for entry in &mut app.library.history {
                         if entry.station.id == station.id {
                             entry.station.url = station.url.clone();
+                            entry.station.update_counts_from(&station);
                             app.dirty = true;
                         }
                     }
-                    app.current = Some(station);
+                    app.current = Some(*station);
                 }
                 self.retry_due = Some(Instant::now() + Duration::from_secs(1));
             }

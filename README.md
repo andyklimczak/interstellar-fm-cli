@@ -64,6 +64,10 @@ Search runs after two characters with a 350 ms debounce. Press `o` to cycle thro
 
 Saved is your favorites library. Removing a favorite does **not** stop the stream or delete its History entry. History contains the last 30 distinct stations by default and only updates once playback starts successfully. You can favorite a removed custom station again from History.
 
+The station table shows **Votes** and **Clicks** instead of codec/bitrate. Votes indicate explicit community approval; clicks indicate Radio Browser station selections, **not actual listener counts**. Neither guarantees stream quality. Numbers are right-aligned with thousands separators. Narrow terminals keep Votes and hide Clicks first; country is shown when space permits. Codec and bitrate remain available in station details (`i`).
+
+Custom streams and older saved entries show `—` when a count is unknown, rather than a misleading zero. Counts are saved with favorites/History and refreshed when the station appears in a new search/discovery response; saved snapshots are not live counters.
+
 ## Add your own radio
 
 1. Press **`a`** from any section.
