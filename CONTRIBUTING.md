@@ -45,5 +45,5 @@ normal library/config are never opened. Internet access and available streams ar
 required; counts and metadata naturally change between captures.
 
 Images are saved in `docs/screenshots/`. Review them before committing; do not include
-private URLs or desktop windows. See [PLAN.md](PLAN.md) for implementation context and
+private URLs or desktop windows. See [PLAN.md](docs/PLAN.md) for implementation context and
 the remaining roadmap.

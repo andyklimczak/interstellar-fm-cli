@@ -110,4 +110,4 @@ interstellarfm-cli --config ./config.example.toml
 ```
 
 Persistent API caches, MPRIS/media keys, mouse controls, mobile-app import/export,
-and richer cursor editing remain follow-ups. See [PLAN.md](../PLAN.md) for the roadmap.
+and richer cursor editing remain follow-ups. See [PLAN.md](PLAN.md) for the roadmap.
