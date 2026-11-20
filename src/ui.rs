@@ -157,7 +157,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         widths.push(Constraint::Length(5));
     }
     let title = if app.section == Section::Search && app.query.trim().chars().count() < 2 {
-        " Popular right now "
+        " Discover stations "
     } else {
         app.section.title()
     };

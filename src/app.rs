@@ -109,7 +109,7 @@ impl App {
             query: String::new(),
             filters: Default::default(),
             results: vec![],
-            sort: Sort::Name,
+            sort: Sort::default(),
             reversed: false,
             searching: false,
             loaded: false,
@@ -584,6 +584,21 @@ mod tests {
     fn key(c: char) -> KeyEvent {
         KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)
     }
+    #[test]
+    fn search_defaults_to_votes_and_cycles_in_the_requested_order() {
+        let mut app = App::new(Config::default(), Library::default());
+        app.section = Section::Search;
+        assert_eq!(app.sort, Sort::Votes);
+        assert!(!app.reversed);
+        for expected in [Sort::Clicks, Sort::Name, Sort::ClickTrend, Sort::Votes] {
+            assert!(matches!(app.key(key('o')).as_slice(), [Effect::Search]));
+            assert_eq!(app.sort, expected);
+            assert!(!app.reversed);
+        }
+        assert!(matches!(app.key(key('O')).as_slice(), [Effect::Search]));
+        assert!(app.reversed);
+    }
+
     #[test]
     fn input_never_triggers_shortcuts() {
         let mut app = App::new(Config::default(), Library::default());

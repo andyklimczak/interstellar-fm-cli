@@ -13,50 +13,38 @@ use tokio::sync::{Mutex, OnceCell};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Sort {
-    #[default]
+    Clicks,
     Name,
-    Popularity,
+    ClickTrend,
+    #[default]
     Votes,
-    Bitrate,
-    Country,
-    Language,
-    Codec,
 }
 impl Sort {
     pub fn label(self) -> &'static str {
         match self {
+            Self::Clicks => "Clicks",
             Self::Name => "Name",
-            Self::Popularity => "Popularity",
+            Self::ClickTrend => "Click trend",
             Self::Votes => "Votes",
-            Self::Bitrate => "Bitrate",
-            Self::Country => "Country",
-            Self::Language => "Language",
-            Self::Codec => "Codec",
         }
     }
     pub fn field(self) -> &'static str {
         match self {
+            Self::Clicks => "clickcount",
             Self::Name => "name",
-            Self::Popularity => "clickcount",
+            Self::ClickTrend => "clicktrend",
             Self::Votes => "votes",
-            Self::Bitrate => "bitrate",
-            Self::Country => "country",
-            Self::Language => "language",
-            Self::Codec => "codec",
         }
     }
     pub fn descending(self, reversed: bool) -> bool {
-        matches!(self, Self::Popularity | Self::Votes | Self::Bitrate) ^ reversed
+        (self != Self::Name) ^ reversed
     }
     pub fn next(self) -> Self {
         match self {
-            Self::Name => Self::Popularity,
-            Self::Popularity => Self::Votes,
-            Self::Votes => Self::Bitrate,
-            Self::Bitrate => Self::Country,
-            Self::Country => Self::Language,
-            Self::Language => Self::Codec,
-            Self::Codec => Self::Name,
+            Self::Clicks => Self::Name,
+            Self::Name => Self::ClickTrend,
+            Self::ClickTrend => Self::Votes,
+            Self::Votes => Self::Clicks,
         }
     }
 }
@@ -210,21 +198,18 @@ impl RadioBrowser {
     pub async fn search(&self, query: &str, sort: Sort, reversed: bool) -> Result<Vec<Station>> {
         self.discover_hosts().await;
         let query = query.trim();
-        let payload: Vec<RadioStation> = if query.chars().count() < 2 {
-            self.request("json/stations/topclick/30", &[]).await?
-        } else {
-            self.request(
-                "json/stations/search",
-                &[
-                    ("name", query.into()),
-                    ("limit", "50".into()),
-                    ("hidebroken", "true".into()),
-                    ("order", sort.field().into()),
-                    ("reverse", sort.descending(reversed).to_string()),
-                ],
-            )
-            .await?
-        };
+        let searching = query.chars().count() >= 2;
+        let mut params = vec![
+            ("limit", if searching { "50" } else { "30" }.into()),
+            ("hidebroken", "true".into()),
+            ("order", sort.field().into()),
+            ("reverse", sort.descending(reversed).to_string()),
+        ];
+        if searching {
+            params.push(("name", query.into()));
+        }
+        // Browse and typed searches honor the same sort, including default Votes.
+        let payload: Vec<RadioStation> = self.request("json/stations/search", &params).await?;
         let mut seen = HashSet::new();
         Ok(payload
             .into_iter()
@@ -297,15 +282,8 @@ mod tests {
     use tokio::io::AsyncWriteExt;
     #[test]
     fn sort_cycle_includes_all_options_and_wraps() {
-        let options = [
-            Sort::Name,
-            Sort::Popularity,
-            Sort::Votes,
-            Sort::Bitrate,
-            Sort::Country,
-            Sort::Language,
-            Sort::Codec,
-        ];
+        assert_eq!(Sort::default(), Sort::Votes);
+        let options = [Sort::Clicks, Sort::Name, Sort::ClickTrend, Sort::Votes];
         for (i, sort) in options.iter().enumerate() {
             assert_eq!(sort.next(), options[(i + 1) % options.len()]);
         }
@@ -313,22 +291,21 @@ mod tests {
 
     #[test]
     fn textual_sorts_are_ascending_and_numeric_sorts_descending() {
-        for sort in [Sort::Name, Sort::Country, Sort::Language, Sort::Codec] {
-            assert!(!sort.descending(false));
-            assert!(sort.descending(true));
-        }
-        for sort in [Sort::Popularity, Sort::Votes, Sort::Bitrate] {
+        assert!(!Sort::Name.descending(false));
+        assert!(Sort::Name.descending(true));
+        for sort in [Sort::Clicks, Sort::ClickTrend, Sort::Votes] {
             assert!(sort.descending(false));
             assert!(!sort.descending(true));
         }
     }
 
     #[tokio::test]
-    async fn new_sort_options_send_the_correct_api_fields_and_direction() {
+    async fn sort_options_send_the_correct_api_fields_and_direction() {
         for (sort, field) in [
-            (Sort::Country, "country"),
-            (Sort::Language, "language"),
-            (Sort::Codec, "codec"),
+            (Sort::Clicks, "clickcount"),
+            (Sort::Name, "name"),
+            (Sort::ClickTrend, "clicktrend"),
+            (Sort::Votes, "votes"),
         ] {
             for reversed in [false, true] {
                 let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -337,7 +314,7 @@ mod tests {
                     let (mut socket, _) = listener.accept().await.unwrap();
                     let request = crate::tests::request_headers(&mut socket).await;
                     assert!(request.contains(&format!("order={field}")));
-                    assert!(request.contains(&format!("reverse={reversed}")));
+                    assert!(request.contains(&format!("reverse={}", sort.descending(reversed))));
                     socket
                         .write_all(
                             b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n[]",
@@ -355,6 +332,38 @@ mod tests {
                 );
                 worker.await.unwrap();
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn empty_and_short_queries_browse_by_votes_by_default() {
+        for query in ["", "j"] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let base = format!("http://{}", listener.local_addr().unwrap());
+            let worker = tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let request = crate::tests::request_headers(&mut socket).await;
+                assert!(request.starts_with("GET /json/stations/search?"));
+                assert!(request.contains("order=votes"));
+                assert!(request.contains("reverse=true"));
+                assert!(request.contains("limit=30"));
+                assert!(!request.contains("name="));
+                socket
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n[]",
+                    )
+                    .await
+                    .unwrap();
+            });
+            let client = RadioBrowser::new(reqwest::Client::new(), Some(base));
+            assert!(
+                client
+                    .search(query, Sort::default(), false)
+                    .await
+                    .unwrap()
+                    .is_empty()
+            );
+            worker.await.unwrap();
         }
     }
 
@@ -470,7 +479,7 @@ mod tests {
             .build()
             .unwrap();
         let radio = RadioBrowser::new(client, None);
-        let stations = radio.search("jazz", Sort::Popularity, false).await.unwrap();
+        let stations = radio.search("jazz", Sort::default(), false).await.unwrap();
         assert!(!stations.is_empty());
         assert!(stations.iter().all(|s| stream_url(&s.url).is_ok()));
     }

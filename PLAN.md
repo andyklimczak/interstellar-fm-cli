@@ -26,8 +26,8 @@ Behavior to preserve:
 - Radio Browser station identity is `stationuuid`, not the name or stream URL. Custom stations use a separate stable local ID (see below).
 - Saved stations (favorites) persist locally and retain their saved order, including manually added streams.
 - History is most-recent-first, deduplicated by station identity, and capped at 30 by default.
-- Search starts at two characters with a 350 ms debounce; shorter input shows 30 popular stations.
-- Search sorting: name ascending, popularity/click count descending, votes descending, or bitrate descending, as in the original app. The CLI additionally offers Country, Language, and Codec (A–Z by default); every search sort can be reversed.
+- Search starts at two characters with a 350 ms debounce; shorter input browses 30 stations using the selected sort.
+- CLI search sorts cycle in this order: Clicks, Name, Click trend, Votes. Votes is the default. Name defaults to A–Z; the other sorts default to highest first, and every sort can be reversed.
 - Stream selection prefers `url_resolved` and falls back to `url`.
 - Volume persists between sessions.
 - Playback and saved state are shared across all sections.
@@ -55,7 +55,7 @@ Use a small navigation sidebar and a large station table, rather than three simu
 
 ```text
 ┌ Interstellar FM ──────────────────────────────────────────────┐
-│ Saved (12) │ Search: jazz                     Sort: Popularity │
+│ Saved (12) │ Search: jazz                     Sort: Votes      │
 │ History    ├──────────────────────────────────────────────────┤
 │ Search     │   Station              Country   Codec   kbps    │
 │            │ > ★ Jazz Radio         France    MP3     128     │
@@ -114,7 +114,7 @@ Input rules:
 - Text-editing mode consumes printable keys, including `q`, `f`, `p`, spaces, and digits; typing must never trigger playback or quit.
 - `Tab` in a search/filter field focuses the results/station list, preserving the query and pending debounce without submitting again or playing a station.
 - `Enter` in a search field submits immediately and focuses results; it does not immediately play a result.
-- `Esc` leaves text editing without discarding the query. Clearing the query restores popular stations.
+- `Esc` leaves text editing without discarding the query. Clearing the query restores ranked station discovery using the selected sort.
 - `Ctrl-c` always exits through the cleanup path.
 - Key sequence handling such as `gg` needs a timeout and must reset when focus changes.
 - Configurable bindings should be validated for conflicts within their input context.
@@ -218,8 +218,7 @@ Implement the client natively in Rust, using the mobile app's API layer as the b
 
 ### MVP endpoints
 
-- `GET /json/stations/search`: name search, limit 50, sort/reverse options, `hidebroken=true`.
-- `GET /json/stations/topclick/30`: popular stations for an empty/short query.
+- `GET /json/stations/search`: name search (limit 50), or ranked browsing without a name filter (limit 30) for an empty/short query; sort/reverse options and `hidebroken=true` apply in both cases. Orders: `clickcount`, `name`, `clicktrend`, and `votes` (default descending).
 - `GET /json/stations/byuuid/{uuid}`: refresh a saved station's stream metadata when needed.
 - `GET /json/url/{uuid}`: best-effort click reporting after a deliberate successful station start, once per play attempt; do not report again on resume/reconnect.
 
@@ -288,7 +287,7 @@ Use standard home-directory fallbacks when XDG variables are unset and platform-
 ### Milestone 2 — Radio Browser discovery
 
 - Build the API client, DTO normalization, host discovery/failover, and HTTP mock tests.
-- Wire popular stations, debounced search, seven sort choices (Name, Popularity, Votes, Bitrate, Country, Language, Codec), loading/error states, and retry.
+- Wire ranked station discovery, debounced search, four sort choices (Clicks, Name, Click trend, Votes; Votes by default), loading/error states, and retry.
 - Ensure stale network responses cannot overwrite newer results.
 
 **Done when:** real stations can be discovered and inspected without blocking the UI.
