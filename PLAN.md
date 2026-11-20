@@ -27,7 +27,7 @@ Behavior to preserve:
 - Saved stations (favorites) persist locally and retain their saved order, including manually added streams.
 - History is most-recent-first, deduplicated by station identity, and capped at 30 by default.
 - Search starts at two characters with a 350 ms debounce; shorter input shows 30 popular stations.
-- Search sorting: name ascending, popularity/click count descending, votes descending, or bitrate descending.
+- Search sorting: name ascending, popularity/click count descending, votes descending, or bitrate descending, as in the original app. The CLI additionally offers Country, Language, and Codec (A–Z by default); every search sort can be reversed.
 - Stream selection prefers `url_resolved` and falls back to `url`.
 - Volume persists between sessions.
 - Playback and saved state are shared across all sections.
@@ -288,7 +288,7 @@ Use standard home-directory fallbacks when XDG variables are unset and platform-
 ### Milestone 2 — Radio Browser discovery
 
 - Build the API client, DTO normalization, host discovery/failover, and HTTP mock tests.
-- Wire popular stations, debounced search, four sort choices, loading/error states, and retry.
+- Wire popular stations, debounced search, seven sort choices (Name, Popularity, Votes, Bitrate, Country, Language, Codec), loading/error states, and retry.
 - Ensure stale network responses cannot overwrite newer results.
 
 **Done when:** real stations can be discovered and inspected without blocking the UI.

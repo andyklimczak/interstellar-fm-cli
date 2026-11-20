@@ -18,6 +18,9 @@ pub enum Sort {
     Popularity,
     Votes,
     Bitrate,
+    Country,
+    Language,
+    Codec,
 }
 impl Sort {
     pub fn label(self) -> &'static str {
@@ -26,6 +29,9 @@ impl Sort {
             Self::Popularity => "Popularity",
             Self::Votes => "Votes",
             Self::Bitrate => "Bitrate",
+            Self::Country => "Country",
+            Self::Language => "Language",
+            Self::Codec => "Codec",
         }
     }
     pub fn field(self) -> &'static str {
@@ -34,14 +40,23 @@ impl Sort {
             Self::Popularity => "clickcount",
             Self::Votes => "votes",
             Self::Bitrate => "bitrate",
+            Self::Country => "country",
+            Self::Language => "language",
+            Self::Codec => "codec",
         }
+    }
+    pub fn descending(self, reversed: bool) -> bool {
+        matches!(self, Self::Popularity | Self::Votes | Self::Bitrate) ^ reversed
     }
     pub fn next(self) -> Self {
         match self {
             Self::Name => Self::Popularity,
             Self::Popularity => Self::Votes,
             Self::Votes => Self::Bitrate,
-            Self::Bitrate => Self::Name,
+            Self::Bitrate => Self::Country,
+            Self::Country => Self::Language,
+            Self::Language => Self::Codec,
+            Self::Codec => Self::Name,
         }
     }
 }
@@ -205,7 +220,7 @@ impl RadioBrowser {
                     ("limit", "50".into()),
                     ("hidebroken", "true".into()),
                     ("order", sort.field().into()),
-                    ("reverse", ((sort != Sort::Name) ^ reversed).to_string()),
+                    ("reverse", sort.descending(reversed).to_string()),
                 ],
             )
             .await?
@@ -280,6 +295,69 @@ impl RadioStation {
 mod tests {
     use super::*;
     use tokio::io::AsyncWriteExt;
+    #[test]
+    fn sort_cycle_includes_all_options_and_wraps() {
+        let options = [
+            Sort::Name,
+            Sort::Popularity,
+            Sort::Votes,
+            Sort::Bitrate,
+            Sort::Country,
+            Sort::Language,
+            Sort::Codec,
+        ];
+        for (i, sort) in options.iter().enumerate() {
+            assert_eq!(sort.next(), options[(i + 1) % options.len()]);
+        }
+    }
+
+    #[test]
+    fn textual_sorts_are_ascending_and_numeric_sorts_descending() {
+        for sort in [Sort::Name, Sort::Country, Sort::Language, Sort::Codec] {
+            assert!(!sort.descending(false));
+            assert!(sort.descending(true));
+        }
+        for sort in [Sort::Popularity, Sort::Votes, Sort::Bitrate] {
+            assert!(sort.descending(false));
+            assert!(!sort.descending(true));
+        }
+    }
+
+    #[tokio::test]
+    async fn new_sort_options_send_the_correct_api_fields_and_direction() {
+        for (sort, field) in [
+            (Sort::Country, "country"),
+            (Sort::Language, "language"),
+            (Sort::Codec, "codec"),
+        ] {
+            for reversed in [false, true] {
+                let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let base = format!("http://{}", listener.local_addr().unwrap());
+                let worker = tokio::spawn(async move {
+                    let (mut socket, _) = listener.accept().await.unwrap();
+                    let request = crate::tests::request_headers(&mut socket).await;
+                    assert!(request.contains(&format!("order={field}")));
+                    assert!(request.contains(&format!("reverse={reversed}")));
+                    socket
+                        .write_all(
+                            b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n[]",
+                        )
+                        .await
+                        .unwrap();
+                });
+                let client = RadioBrowser::new(reqwest::Client::new(), Some(base));
+                assert!(
+                    client
+                        .search("jazz", sort, reversed)
+                        .await
+                        .unwrap()
+                        .is_empty()
+                );
+                worker.await.unwrap();
+            }
+        }
+    }
+
     #[test]
     fn tolerates_nulls_and_falls_back_to_original_url() {
         let dto: RadioStation = serde_json::from_str(r#"{"stationuuid":"abc","name":"Radio","url":"http://example.com/live","url_resolved":"","country":null,"bitrate":null,"extra":42}"#).unwrap();

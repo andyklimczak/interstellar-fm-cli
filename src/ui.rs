@@ -53,7 +53,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                 " INTERSTELLAR FM ",
                 Style::default().fg(color).add_modifier(Modifier::BOLD),
             ),
-            Span::raw(" · terminal radio"),
+            Span::raw(" · radio from the universe via the internet"),
         ])),
         rows[0],
     );
@@ -374,6 +374,26 @@ fn input(frame: &mut Frame, area: Rect, title: &str, value: &str, focused: bool,
 mod tests {
     use super::*;
     use ratatui::{Terminal, backend::TestBackend};
+    #[test]
+    fn header_displays_the_universe_tagline() {
+        let mut app = App::new(
+            crate::config::Config::default(),
+            crate::model::Library::default(),
+        );
+        let mut terminal = Terminal::new(TestBackend::new(120, 35)).unwrap();
+        terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+        let header: String = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .take(120)
+            .map(|cell| cell.symbol())
+            .collect();
+        assert!(header.contains("radio from the universe via the internet"));
+        assert!(!header.contains("terminal radio"));
+    }
+
     #[test]
     fn renders_normal_narrow_tiny_and_overlays() {
         for (width, height) in [(120, 35), (60, 22), (36, 12), (15, 5)] {
