@@ -51,17 +51,17 @@ Do not bring over album browsing, queues, shuffle, repeat, seeking, scrobbling, 
 
 ### Layout
 
-Use a small navigation sidebar and a large station table, rather than three simultaneous station lists. The three sections remain visible and one section's content is active at a time.
+Always show Saved / History / Search as top tabs, with a full-width station table below. The three sections remain visible and one section's content is active at a time; there is no sidebar, even on wide terminals.
 
 ```text
 ┌ Interstellar FM ──────────────────────────────────────────────┐
-│ Saved (12) │ Search: jazz                     Sort: Votes      │
-│ History    ├──────────────────────────────────────────────────┤
-│ Search     │   Station              Country   Votes   Clicks  │
-│            │ > ★ Jazz Radio         France       12k     68k  │
-│            │     Jazz24             USA         4.3k     23k  │
-│            │                                                  │
-├────────────┴──────────────────────────────────────────────────┤
+│ 1 Saved | 2 History | 3 Search                                │
+├───────────────────────────────────────────────────────────────┤
+│ Search: jazz                                  Sort: Votes     │
+│   Station                          Country   Votes   Clicks   │
+│ > ★ Jazz Radio                     France       12k     68k   │
+│     Jazz24                         USA         4.3k     23k   │
+├───────────────────────────────────────────────────────────────┤
 │ PLAYING  Jazz Radio · Artist — Track, when available           │
 │ LIVE · MP3 128 kbps                     Volume: 70%            │
 ├───────────────────────────────────────────────────────────────┤
@@ -69,7 +69,7 @@ Use a small navigation sidebar and a large station table, rather than three simu
 └───────────────────────────────────────────────────────────────┘
 ```
 
-- Sidebar: Saved / History / Search, with counts where useful.
+- Top tabs: Saved / History / Search, at every terminal width. Underline the active tab when navigation has focus.
 - Main pane: table with saved marker, station name, country, Votes, and Clicks. Show right-aligned compact counts (`23k`, `2.3k`, `1.2m`), keeping exact counts with thousands separators in station details; keep Votes on narrow terminals and hide Clicks/country when needed. Codec/bitrate stay in station details. Unknown counts (custom streams and legacy snapshots) display as `—`, not zero. Counts persist in saved/History snapshots and update when directory responses provide fresh values. Add last-played time in History when space allows.
 - Distinguish the selected row from the currently playing station.
 - Preserve each section's selection and scroll position independently.
@@ -77,7 +77,7 @@ Use a small navigation sidebar and a large station table, rather than three simu
 - Bottom player: station, playback/buffering/error state, available ICY metadata, live indicator, volume, and mute state. Do not show a misleading track progress bar.
 - Context-sensitive footer and a help overlay generated from the active keymap.
 - Station details popup: country, language, votes/clicks, tags, homepage, codec, bitrate, and stream URL.
-- At narrow widths, replace the sidebar with top tabs and drop lower-priority columns. At very small sizes, show a resize message without panicking.
+- At narrow widths, retain the top tabs and drop lower-priority table columns. At very small sizes, show a resize message without panicking.
 - Loading, empty, offline, and error states should explain what happened and how to retry.
 - Dark terminal-friendly defaults, configurable accents, and an ASCII fallback; no required Nerd Font or image protocol.
 
@@ -88,11 +88,12 @@ These are inspired by SubTUI, with a few radio-specific additions. Bindings appl
 | Action | Default keys |
 | --- | --- |
 | Open Saved / History / Search | `1` / `2` / `3` |
-| Next / previous focusable region | `Tab` / `Shift-Tab` |
-| Navigate rows or sidebar | `j` / `k`, Down / Up |
+| Switch tabs / list focus | `Tab` / `Shift-Tab` |
+| Previous / next tab (wrapping) | Left / Right, `h` / `l` |
+| Navigate station rows | `j` / `k`, Down / Up |
 | First / last row | `gg` / `G`, Home / End |
 | Page / half-page movement | PgUp / PgDn, `Ctrl-u` / `Ctrl-d` |
-| Play selected station; activate sidebar item | `Enter` |
+| Play selected station; focus the list when tabs are focused | `Enter` |
 | Toggle favorite for selected station | `f` |
 | Add a stream URL or `.pls` playlist to favorites | `a` |
 | Remove selected favorite (Saved section only) | `d` |

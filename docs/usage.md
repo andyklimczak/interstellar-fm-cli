@@ -2,8 +2,10 @@
 
 ## Discovery and navigation
 
-- `1`, `2`, `3` open Saved, History, and Search. Tab/Shift-Tab switch sidebar/table focus.
-- Move with arrows or `j`/`k`; Home/End or `gg`/`G` jump to the first/last row.
+- Saved, History, and Search always appear as tabs at the top, with the station list using the full width.
+- `1`, `2`, `3` open Saved, History, and Search. Left/Right or `h`/`l` switch tabs (wrapping at either end).
+- Tab/Shift-Tab switch tabs/list focus. When the tabs are focused, the active tab is underlined; Enter or Down returns to the list without playing.
+- Move through stations with Up/Down or `j`/`k`; Home/End or `gg`/`G` jump to the first/last row.
 - PgUp/PgDn move a page; Ctrl-u/Ctrl-d move a half-page in navigation mode.
 - `/` edits the search query, or a local filter in Saved/History. Tab focuses results without clearing the query; Enter submits immediately and focuses results. Press Enter again to play.
 - Text fields currently edit at the end. Backspace edits, Ctrl-u clears, and Esc leaves the field. Bracketed paste is supported. Printable shortcuts such as `q` never trigger actions while typing.

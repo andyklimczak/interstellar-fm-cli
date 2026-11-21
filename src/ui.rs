@@ -112,41 +112,19 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         ])),
         rows[0],
     );
-    let main = if size.width >= 85 {
-        let columns =
-            Layout::horizontal([Constraint::Length(17), Constraint::Min(20)]).split(rows[1]);
-        let items = [
-            format!("1 Saved ({})", app.library.favorites.len()),
-            format!("2 History ({})", app.library.history.len()),
-            "3 Search".into(),
-        ];
-        let mut state = ListState::default().with_selected(Some(app.section.index()));
-        frame.render_stateful_widget(
-            List::new(items)
-                .block(panel(
-                    " Library ",
-                    if app.sidebar_focus {
-                        color
-                    } else {
-                        Color::DarkGray
-                    },
-                ))
-                .highlight_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
-                .highlight_symbol("> "),
-            columns[0],
-            &mut state,
-        );
-        columns[1]
-    } else {
-        let rows = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(rows[1]);
-        frame.render_widget(
-            Tabs::new(["1 Saved", "2 History", "3 Search"])
-                .select(app.section.index())
-                .highlight_style(Style::default().fg(color).add_modifier(Modifier::BOLD)),
-            rows[0],
-        );
-        rows[1]
-    };
+    let content = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(rows[1]);
+    let tab_highlight = Style::default().fg(color).add_modifier(Modifier::BOLD);
+    frame.render_widget(
+        Tabs::new(["1 Saved", "2 History", "3 Search"])
+            .select(app.section.index())
+            .highlight_style(if app.tabs_focus {
+                tab_highlight.add_modifier(Modifier::UNDERLINED)
+            } else {
+                tab_highlight
+            }),
+        content[0],
+    );
+    let main = content[1];
     let panes = Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).split(main);
     let editing = matches!(app.mode, Mode::Editing);
     let query = if app.section == Section::Search {
@@ -222,7 +200,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         )
         .block(panel(
             title,
-            if !app.sidebar_focus && matches!(app.mode, Mode::Normal) {
+            if !app.tabs_focus && matches!(app.mode, Mode::Normal) {
                 color
             } else {
                 Color::DarkGray
@@ -543,6 +521,69 @@ mod tests {
         assert!(text.contains("Votes"));
         assert!(text.contains("Clicks"));
         assert_eq!(text.matches('—').count(), 2);
+    }
+
+    #[test]
+    fn tabs_stay_at_the_top_and_content_uses_full_width_at_every_size() {
+        for section in [Section::Saved, Section::History, Section::Search] {
+            for width in [36, 60, 85, 120, 160] {
+                let mut app = App::new(
+                    crate::config::Config::default(),
+                    crate::model::Library::default(),
+                );
+                app.section = section;
+                let mut terminal = Terminal::new(TestBackend::new(width, 35)).unwrap();
+                terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+                let buffer = terminal.backend().buffer();
+                let tabs: String = (0..width).map(|x| buffer[(x, 1)].symbol()).collect();
+                for label in ["1 Saved", "2 History", "3 Search"] {
+                    assert!(tabs.contains(label), "missing {label} at width {width}");
+                }
+                assert_eq!(
+                    buffer[(0, 3)].symbol(),
+                    "┌",
+                    "filter starts at the left edge"
+                );
+                assert_eq!(
+                    buffer[(width - 1, 3)].symbol(),
+                    "┐",
+                    "filter uses the full width"
+                );
+                assert_eq!(
+                    buffer[(0, 6)].symbol(),
+                    "┌",
+                    "table starts at the left edge"
+                );
+                assert_eq!(
+                    buffer[(width - 1, 6)].symbol(),
+                    "┐",
+                    "table uses the full width"
+                );
+                let text: String = buffer.content.iter().map(|cell| cell.symbol()).collect();
+                assert!(!text.contains("Library"));
+            }
+        }
+    }
+
+    #[test]
+    fn focused_tab_is_underlined_without_underlining_the_other_tabs() {
+        let mut app = App::new(
+            crate::config::Config::default(),
+            crate::model::Library::default(),
+        );
+        let mut terminal = Terminal::new(TestBackend::new(120, 35)).unwrap();
+        for focused in [false, true] {
+            app.tabs_focus = focused;
+            terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+            let buffer = terminal.backend().buffer();
+            let saved = (0..120).find(|&x| buffer[(x, 1)].symbol() == "1").unwrap();
+            let history = (0..120).find(|&x| buffer[(x, 1)].symbol() == "2").unwrap();
+            assert_eq!(
+                buffer[(saved, 1)].modifier.contains(Modifier::UNDERLINED),
+                focused
+            );
+            assert!(!buffer[(history, 1)].modifier.contains(Modifier::UNDERLINED));
+        }
     }
 
     #[test]

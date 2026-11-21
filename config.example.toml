@@ -22,7 +22,7 @@ accent = "magenta" # magenta, cyan, green, blue, yellow, red
 # quit = ["q"]
 
 # Available actions:
-# saved, history, search, focus, up, down, top, bottom, page_up, page_down,
+# saved, history, search, previous_tab, next_tab, focus, up, down, top, bottom, page_up, page_down,
 # half_page_up, half_page_down, play, favorite, add, remove, pause, stop,
 # volume_up, volume_down, mute, filter, sort, reverse, refresh, details, help, quit
 # Keys: a single case-sensitive character; ctrl+x; enter, space, tab,

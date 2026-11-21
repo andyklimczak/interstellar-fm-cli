@@ -21,6 +21,20 @@ impl Section {
             Self::Search => 2,
         }
     }
+    fn next(self) -> Self {
+        match self {
+            Self::Saved => Self::History,
+            Self::History => Self::Search,
+            Self::Search => Self::Saved,
+        }
+    }
+    fn previous(self) -> Self {
+        match self {
+            Self::Saved => Self::Search,
+            Self::History => Self::Saved,
+            Self::Search => Self::History,
+        }
+    }
     pub fn title(self) -> &'static str {
         match self {
             Self::Saved => "Saved",
@@ -74,7 +88,7 @@ pub struct App {
     pub section: Section,
     pub tables: [TableState; 3],
     pub mode: Mode,
-    pub sidebar_focus: bool,
+    pub tabs_focus: bool,
     pub query: String,
     pub filters: [String; 2],
     pub results: Vec<Station>,
@@ -105,7 +119,7 @@ impl App {
             section: Section::Saved,
             tables: std::array::from_fn(|_| TableState::default().with_selected(Some(0))),
             mode: Mode::Normal,
-            sidebar_focus: false,
+            tabs_focus: false,
             query: String::new(),
             filters: Default::default(),
             results: vec![],
@@ -255,7 +269,7 @@ impl App {
             Mode::Editing => {
                 match key.code {
                     KeyCode::Esc => {}
-                    KeyCode::Tab => self.sidebar_focus = false,
+                    KeyCode::Tab => self.tabs_focus = false,
                     KeyCode::Enter => {
                         if self.section == Section::Search {
                             self.schedule_search(true);
@@ -448,21 +462,11 @@ impl App {
             KeyCode::Char('1') => return self.set_section(Section::Saved),
             KeyCode::Char('2') => return self.set_section(Section::History),
             KeyCode::Char('3') => return self.set_section(Section::Search),
-            KeyCode::Tab | KeyCode::BackTab => self.sidebar_focus = !self.sidebar_focus,
-            KeyCode::Down | KeyCode::Char('j') if self.sidebar_focus => {
-                return self.set_section(match self.section {
-                    Section::Saved => Section::History,
-                    Section::History => Section::Search,
-                    Section::Search => Section::Saved,
-                });
-            }
-            KeyCode::Up | KeyCode::Char('k') if self.sidebar_focus => {
-                return self.set_section(match self.section {
-                    Section::Saved => Section::Search,
-                    Section::History => Section::Saved,
-                    Section::Search => Section::History,
-                });
-            }
+            KeyCode::Tab | KeyCode::BackTab => self.tabs_focus = !self.tabs_focus,
+            KeyCode::Right => return self.set_section(self.section.next()),
+            KeyCode::Left => return self.set_section(self.section.previous()),
+            KeyCode::Down | KeyCode::Char('j') if self.tabs_focus => self.tabs_focus = false,
+            KeyCode::Up | KeyCode::Char('k') if self.tabs_focus => {}
             KeyCode::Down | KeyCode::Char('j') => self.move_row(1),
             KeyCode::Up | KeyCode::Char('k') => self.move_row(-1),
             KeyCode::PageDown => self.move_row(20),
@@ -480,7 +484,7 @@ impl App {
                     self.last_g = Some(Instant::now());
                 }
             }
-            KeyCode::Enter if self.sidebar_focus => self.sidebar_focus = false,
+            KeyCode::Enter if self.tabs_focus => self.tabs_focus = false,
             KeyCode::Enter => {
                 if let Some(s) = self.selected() {
                     return vec![Effect::Play(s)];
@@ -515,7 +519,7 @@ impl App {
                 return vec![Effect::Mute(self.library.muted)];
             }
             KeyCode::Char('/') => {
-                self.sidebar_focus = false;
+                self.tabs_focus = false;
                 self.mode = Mode::Editing;
             }
             KeyCode::Char('o') if self.section == Section::Search => {
@@ -639,6 +643,77 @@ mod tests {
     }
 
     #[test]
+    fn horizontal_keys_switch_tabs_and_preserve_each_selection() {
+        let mut app = App::new(Config::default(), Library::default());
+        app.loaded = true;
+        app.library.favorites = (0..3)
+            .map(|index| {
+                Station::custom(
+                    url::Url::parse(&format!("https://example.com/{index}")).unwrap(),
+                    &format!("Station {index}"),
+                    None,
+                )
+            })
+            .collect();
+        for station in app.library.favorites.clone() {
+            app.library.record(station, 30);
+        }
+        app.results = app.library.favorites.clone();
+        app.tables[0].select(Some(2));
+        app.tables[1].select(Some(1));
+        let nav = |code| KeyEvent::new(code, KeyModifiers::NONE);
+        app.key(nav(KeyCode::Right));
+        assert_eq!(app.section, Section::History);
+        app.key(key('l'));
+        assert_eq!(app.section, Section::Search);
+        app.key(nav(KeyCode::Right));
+        assert_eq!(app.section, Section::Saved);
+        assert_eq!(app.tables[0].selected(), Some(2));
+        app.key(nav(KeyCode::Left));
+        assert_eq!(app.section, Section::Search);
+        app.key(key('h'));
+        assert_eq!(app.section, Section::History);
+        assert_eq!(app.tables[1].selected(), Some(1));
+    }
+
+    #[test]
+    fn focused_tabs_use_horizontal_navigation_and_enter_or_down_returns_to_results() {
+        let mut app = App::new(Config::default(), Library::default());
+        let nav = |code| KeyEvent::new(code, KeyModifiers::NONE);
+        app.key(nav(KeyCode::Tab));
+        assert!(app.tabs_focus);
+        app.key(nav(KeyCode::Right));
+        assert_eq!(app.section, Section::History);
+        assert!(app.key(nav(KeyCode::Enter)).is_empty());
+        assert!(!app.tabs_focus);
+        app.key(nav(KeyCode::BackTab));
+        assert!(app.tabs_focus);
+        app.key(nav(KeyCode::Up));
+        assert_eq!(app.section, Section::History);
+        app.key(nav(KeyCode::Down));
+        assert!(!app.tabs_focus);
+        assert_eq!(app.section, Section::History);
+    }
+
+    #[test]
+    fn horizontal_shortcuts_do_not_change_tabs_during_text_entry() {
+        let mut app = App::new(Config::default(), Library::default());
+        app.section = Section::Search;
+        app.key(key('/'));
+        for code in [
+            KeyCode::Left,
+            KeyCode::Right,
+            KeyCode::Char('h'),
+            KeyCode::Char('l'),
+        ] {
+            app.key(KeyEvent::new(code, KeyModifiers::NONE));
+        }
+        assert_eq!(app.section, Section::Search);
+        assert_eq!(app.query, "hl");
+        assert!(matches!(app.mode, Mode::Editing));
+    }
+
+    #[test]
     fn input_never_triggers_shortcuts() {
         let mut app = App::new(Config::default(), Library::default());
         app.section = Section::Search;
@@ -672,13 +747,13 @@ mod tests {
                 .is_empty()
         );
         assert!(matches!(app.mode, Mode::Normal));
-        assert!(!app.sidebar_focus);
+        assert!(!app.tabs_focus);
         assert_eq!(app.query, "jazz");
         assert_eq!(app.search_generation, generation);
         assert_eq!(app.search_due, due);
         assert!(app.searching);
 
-        // Navigation now operates on rows, not the query or sidebar.
+        // Navigation now operates on rows, not the query or tabs.
         app.key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
         assert_eq!(app.tables[2].selected(), Some(1));
         assert_eq!(app.query, "jazz");
@@ -699,7 +774,7 @@ mod tests {
                 .is_empty()
         );
         assert!(matches!(app.mode, Mode::Normal));
-        assert!(!app.sidebar_focus);
+        assert!(!app.tabs_focus);
         assert!(app.query.is_empty());
         assert!(
             app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))

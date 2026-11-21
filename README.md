@@ -63,7 +63,8 @@ Run without installing: `cargo run --release`.
 | Action | Keys |
 | --- | --- |
 | Saved / History / Search | `1` / `2` / `3` |
-| Navigate | Arrows or `j` / `k` |
+| Previous / next tab | Left / Right or `h` / `l` |
+| Navigate stations | Up / Down or `j` / `k` |
 | Search / filter; return to results | `/`, then `Tab` |
 | Play selected; pause / resume | `Enter`; `p` or Space |
 | Favorite / unfavorite; remove from Saved | `f`; `d` |

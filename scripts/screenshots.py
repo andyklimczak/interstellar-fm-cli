@@ -126,6 +126,9 @@ def main():
                     raise RuntimeError(f"Timed out waiting for {description}:\n{text}")
 
                 def capture(name):
+                    text = screen()
+                    if not any(all(label in line for label in ["1 Saved", "2 History", "3 Search"]) for line in text.splitlines()[:3]):
+                        raise RuntimeError("Expected top navigation tabs; rebuild the release binary before capturing")
                     time.sleep(0.3)
                     path = args.output / f"{name}.png"
                     subprocess.run(["magick", "import", "-window", window, "-strip", str(path)], env=env, check=True)
