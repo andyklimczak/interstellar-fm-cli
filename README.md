@@ -33,14 +33,23 @@ Captured from the running app with public stations in an isolated demo library.
 Requires **Linux**, a current stable [Rust toolchain](https://rustup.rs/), and
 [mpv](https://mpv.io/) in your `PATH` (`sudo pacman -S mpv` or `sudo apt install mpv`).
 
-From a checkout:
+Build from a checkout and copy the binary to a standard user-local location:
 
 ```bash
-cargo install --path .
-interstellarfm-cli
+cargo build --release --locked
+install -Dm755 target/release/interstellarfm-cli "$HOME/.local/bin/interstellarfm-cli"
 ```
 
-Or run without installing: `cargo run --release`.
+Add these lines to `~/.bashrc` (Bash) or `~/.zshrc` (Zsh), then open a new terminal:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+alias ifm='interstellarfm-cli'
+```
+
+Launch with **`ifm`** or `interstellarfm-cli`. Alternatively,
+`cargo install --locked --path .` installs to `~/.cargo/bin`.
+Run without installing: `cargo run --release`.
 
 ## Controls
 
