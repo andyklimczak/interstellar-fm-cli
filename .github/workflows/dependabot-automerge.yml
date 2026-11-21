@@ -1,0 +1,48 @@
+name: Dependabot auto-merge
+
+# Trusted default-branch workflow, triggered only after the entire Rust CI run.
+# Never checks out a PR or runs dependency code with the PAT.
+on:
+  workflow_run:
+    workflows: [Rust CI]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependabot-automerge-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      startsWith(github.event.workflow_run.head_branch, 'dependabot/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check token configuration
+        env:
+          GH_TOKEN: ${{ secrets.DEPENDABOT_AUTOMERGE_PAT }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Set the Actions repository secret DEPENDABOT_AUTOMERGE_PAT (see docs/maintenance.md)."
+            exit 1
+          fi
+
+      - name: Check out trusted workflow code only
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+
+      - name: Approve and squash-merge verified minor or patch updates
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.DEPENDABOT_AUTOMERGE_PAT }}
+          script: |
+            const autoMerge = require('./.github/scripts/dependabot-automerge.cjs');
+            await autoMerge({ github, context, core });

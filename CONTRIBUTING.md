@@ -26,7 +26,8 @@ python3 scripts/smoke-test.py --codecs  # Also MP3/AAC/Ogg/HLS; requires ffmpeg
 ```
 
 The smoke test uses a temporary library and null audio output. CI runs formatting,
-Clippy, unit tests, and the codec smoke test on Linux.
+Clippy, unit tests, and the codec smoke test on Linux. Repository maintainers can
+configure Dependabot's CI-gated merging as described in [Repository automation](docs/maintenance.md).
 
 ## README screenshots
 
