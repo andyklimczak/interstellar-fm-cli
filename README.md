@@ -47,6 +47,13 @@ export PATH="$HOME/.local/bin:$PATH"
 alias ifm='interstellarfm-cli'
 ```
 
+For **Fish**, run these once to persist the PATH entry and `ifm` alias:
+
+```fish
+fish_add_path "$HOME/.local/bin"
+alias --save ifm interstellarfm-cli
+```
+
 Launch with **`ifm`** or `interstellarfm-cli`. Alternatively,
 `cargo install --locked --path .` installs to `~/.cargo/bin`.
 Run without installing: `cargo run --release`.
