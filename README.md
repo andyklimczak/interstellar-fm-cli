@@ -71,4 +71,5 @@ and playback details. For development and tests, see [Contributing](CONTRIBUTING
 
 ## License
 
-[MIT](LICENSE). Discovery is provided by Radio Browser; playback uses mpv.
+Released under the [MIT License](LICENSE).
+Discovery is provided by Radio Browser; playback uses mpv.
