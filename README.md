@@ -60,22 +60,32 @@ Run without installing: `cargo run --release`.
 
 ## Controls
 
-| Action | Keys |
+| Action | Default keys |
 | --- | --- |
-| Saved / History / Search | `1` / `2` / `3` |
-| Previous / next tab | Left / Right or `h` / `l` |
-| Navigate stations | Up / Down or `j` / `k` |
-| Search / filter; return to results | `/`, then `Tab` |
-| Play selected; pause / resume | `Enter`; `p` or Space |
-| Favorite / unfavorite; remove from Saved | `f`; `d` |
-| Add stream URL or `.pls` | `a` |
-| Volume; mute | `+` / `-` or `v` / `V`; `m` |
-| Cycle sort; reverse order | `o`; `O` |
-| Station details; all controls | `i`; `?` |
-| Quit | `q` or `Ctrl-c` |
+| Open Saved / History / Search | `1` / `2` / `3` |
+| Previous / next tab | `Left` / `Right` or `h` / `l` |
+| Switch focus between tabs and station list | `Tab` or `Shift+Tab` |
+| Move up / down | `Up` / `Down` or `k` / `j` |
+| First / last station | `Home` / `End` or `gg` / `G` |
+| Page / half-page up or down | `PgUp` / `PgDn`, `Ctrl+U` / `Ctrl+D` |
+| Edit search or local filter | `/` |
+| Cycle sort / reverse order / refresh Search | `o` / `O` / `r` |
+| Play selected station | `Enter` |
+| Pause / resume; stop | `p` or `Space`; `s` to stop |
+| Volume up / down | `+` / `-` or `v` / `V` (`=` also raises volume) |
+| Toggle mute | `m` |
+| Toggle favorite; remove from Saved with confirmation | `f`; `d` to remove |
+| Add a stream URL or local/remote `.pls` | `a` |
+| Station details / help | `i` / `?` |
+| Quit | `q` or `Ctrl+C` |
 
-Sort by **Clicks, Name, Click trend, or Votes** (default). Counts are compact
-(`23k`, `2.3k`); station details show exact values. Clicks are not listener counts.
+When the tabs have focus, `Enter` or `Down` returns to the list without playing.
+While editing a search or filter, `Tab` returns to the list without clearing the
+query. `Enter` submits a search immediately and returns to results; press it again
+to play. `Esc` leaves the field or closes a dialog.
+
+Sort cycles through **Clicks → Name → Click trend → Votes** (default). Counts are
+compact (`23k`, `2.3k`); station details show exact values. Clicks are not listener counts.
 
 ## Configuration
 
