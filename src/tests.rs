@@ -45,23 +45,25 @@ fn fixture() -> (Engine, App, Station) {
 #[test]
 fn audio_levels_are_isolated_by_session_and_playback_state() {
     let (mut engine, mut app, _) = fixture();
-    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(-20.0)));
+    let bands = player::AudioMeter::Bands([-33.0, -20.0, -27.0]);
+    let loudness = player::AudioMeter::Loudness(-12.0);
+    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(bands)));
     assert_eq!(app.audio_level, None);
     engine.player_event(&mut app, 4, PlayerEvent::Started);
-    engine.player_event(&mut app, 3, PlayerEvent::AudioLevel(Some(-1.0)));
+    engine.player_event(&mut app, 3, PlayerEvent::AudioLevel(Some(bands)));
     assert_eq!(app.audio_level, None);
-    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(-20.0)));
-    assert_eq!(app.audio_level, Some(-20.0));
+    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(bands)));
+    assert_eq!(app.audio_level, Some(bands));
     engine.player_event(&mut app, 4, PlayerEvent::Paused(true));
-    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(-10.0)));
+    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(bands)));
     assert_eq!(app.audio_level, None);
     engine.player_event(&mut app, 4, PlayerEvent::Paused(false));
-    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(-12.0)));
-    assert_eq!(app.audio_level, Some(-12.0));
+    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(loudness)));
+    assert_eq!(app.audio_level, Some(loudness));
     engine.player_event(&mut app, 4, PlayerEvent::Buffering(true));
     assert_eq!(app.audio_level, None);
     engine.player_event(&mut app, 4, PlayerEvent::Buffering(false));
-    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(-15.0)));
+    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(loudness)));
     engine.effect(&mut app, Effect::Stop);
     assert_eq!(app.audio_level, None);
     assert_eq!(app.library.history.len(), 1);

@@ -102,7 +102,7 @@ pub struct App {
     pub message: String,
     pub current: Option<Station>,
     pub playback: String,
-    pub audio_level: Option<f32>,
+    pub audio_level: Option<crate::player::AudioMeter>,
     pub metadata: String,
     pub paused: bool,
     pub dirty: bool,

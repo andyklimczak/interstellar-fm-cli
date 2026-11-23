@@ -6,11 +6,20 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MeterMode {
+    #[default]
+    Bands,
+    Loudness,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub mpv_path: String,
     pub audio_meter: bool,
+    pub audio_meter_mode: MeterMode,
     pub history_limit: usize,
     pub debounce_ms: u64,
     pub api_base: Option<String>,
@@ -22,6 +31,7 @@ impl Default for Config {
         Self {
             mpv_path: "mpv".into(),
             audio_meter: true,
+            audio_meter_mode: MeterMode::default(),
             history_limit: 30,
             debounce_ms: 350,
             api_base: None,

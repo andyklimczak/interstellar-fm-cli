@@ -1,3 +1,4 @@
+use crate::config::MeterMode;
 use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
 use std::{process::Stdio, time::Duration};
@@ -7,10 +8,29 @@ use tokio::{
         UnixStream,
         unix::{OwnedReadHalf, OwnedWriteHalf},
     },
-    process::{Child, Command},
+    process::{Child, ChildStdout, Command},
     sync::mpsc,
     task::JoinHandle,
 };
+
+// Playback is the untouched first output. Only the analysis branch is downmixed,
+// resampled and split; cap its output to 150 ms windows and send it over stdout.
+const BAND_FILTER: &str = concat!(
+    "@meter:lavfi=[asplit=2[out][analysis];",
+    "[analysis]aformat=sample_rates=24000:channel_layouts=mono,",
+    "asetnsamples=n=3600:p=0,acrossover=split='200 2500'[bass][mids][treble];",
+    "[bass][mids][treble]amerge=inputs=3,ametadata=mode=delete,",
+    "astats=metadata=1:reset=1:measure_perchannel=RMS_level:measure_overall=none,",
+    r"ametadata=mode=print:file='pipe\:1':direct=1,anullsink]",
+);
+const LOUDNESS_FILTER: &str =
+    "@meter:lavfi=[astats=metadata=1:reset=1:measure_perchannel=none:measure_overall=RMS_level]";
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AudioMeter {
+    Loudness(f32),
+    Bands([f32; 3]),
+}
 
 #[derive(Debug)]
 pub enum PlayerEvent {
@@ -18,7 +38,7 @@ pub enum PlayerEvent {
     Paused(bool),
     Buffering(bool),
     Metadata(String),
-    AudioLevel(Option<f32>),
+    AudioLevel(Option<AudioMeter>),
     Failed(String),
 }
 #[derive(Debug)]
@@ -32,7 +52,7 @@ pub enum Control {
 pub struct PlaybackOptions {
     pub volume: u8,
     pub muted: bool,
-    pub audio_meter: bool,
+    pub meter: Option<MeterMode>,
 }
 
 #[derive(Default)]
@@ -97,12 +117,13 @@ impl Drop for Player {
 struct Session {
     child: Child,
     lines: tokio::io::Lines<BufReader<OwnedReadHalf>>,
+    band_output: Option<tokio::io::Lines<BufReader<ChildStdout>>>,
     writer: OwnedWriteHalf,
     next_id: u64,
     _dir: tempfile::TempDir,
 }
 impl Session {
-    async fn open(path: &str) -> Result<Self> {
+    async fn open(path: &str, capture_bands: bool) -> Result<Self> {
         let dir = tempfile::Builder::new()
             .prefix("interstellarfm-")
             .tempdir()?;
@@ -126,7 +147,11 @@ impl Session {
             ])
             .arg(format!("--input-ipc-server={}", socket.display()))
             .stdin(Stdio::null())
-            .stdout(Stdio::null())
+            .stdout(if capture_bands {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            })
             .stderr(Stdio::null())
             .kill_on_drop(true)
             .spawn()
@@ -145,9 +170,14 @@ impl Session {
         .await
         .context("mpv IPC socket did not become ready")??;
         let (reader, writer) = stream.into_split();
+        let band_output = child
+            .stdout
+            .take()
+            .map(|stdout| BufReader::new(stdout).lines());
         Ok(Self {
             child,
             lines: BufReader::new(reader).lines(),
+            band_output,
             writer,
             next_id: 0,
             _dir: dir,
@@ -174,7 +204,7 @@ async fn session(
     events: mpsc::Sender<(u64, PlayerEvent)>,
 ) -> Result<()> {
     crate::playlist::stream_url(url)?;
-    let mut session = Session::open(path).await?;
+    let mut session = Session::open(path, options.meter == Some(MeterMode::Bands)).await?;
     for (i, property) in ["pause", "paused-for-cache", "metadata", "media-title"]
         .iter()
         .enumerate()
@@ -189,9 +219,12 @@ async fn session(
     session
         .command(json!(["set_property", "mute", options.muted]))
         .await?;
-    let mut meter_setup = if options.audio_meter {
-        // Measure just RMS on the decoded audio; the filter passes audio through.
-        Some(session.command(json!(["af", "add", "@meter:lavfi=[astats=metadata=1:reset=1:measure_perchannel=none:measure_overall=RMS_level]"])).await?)
+    let filter = options.meter.map(|mode| match mode {
+        MeterMode::Bands => BAND_FILTER,
+        MeterMode::Loudness => LOUDNESS_FILTER,
+    });
+    let mut meter_setup = if let Some(filter) = filter {
+        Some(session.command(json!(["af", "add", filter])).await?)
     } else {
         None
     };
@@ -201,6 +234,8 @@ async fn session(
     let mut buffering = false;
     let mut meter_enabled = false;
     let mut meter_request = None;
+    let mut band_frame = BandFrame::default();
+    let mut latest_bands = None;
     let mut meter_tick = tokio::time::interval(Duration::from_millis(150));
     meter_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut watchdog = tokio::time::interval(Duration::from_secs(1));
@@ -233,7 +268,8 @@ async fn session(
                     meter_request = None;
                     if !paused && !buffering {
                         // Meter telemetry is optional and must never delay playback/control events.
-                        let _ = events.try_send((generation, PlayerEvent::AudioLevel(audio_level(&value))));
+                        let level = audio_level(&value).map(AudioMeter::Loudness);
+                        let _ = events.try_send((generation, PlayerEvent::AudioLevel(level)));
                     }
                     continue;
                 }
@@ -253,11 +289,39 @@ async fn session(
                         PlayerEvent::Buffering(value) => buffering = value,
                         _ => {}
                     }
+                    if paused || buffering {
+                        latest_bands = None;
+                    }
                     let _ = events.send((generation, event)).await;
                 }
             }
+            // Drain the analyzer pipe even while paused/connecting, so it can't block mpv.
+            line = async { session.band_output.as_mut().unwrap().next_line().await }, if session.band_output.is_some() => {
+                match line {
+                    Ok(Some(line)) => {
+                        if let Some(bands) = band_frame.push(&line) && started && !paused && !buffering {
+                            latest_bands = Some(bands);
+                        }
+                    }
+                    _ => {
+                        session.band_output = None;
+                        latest_bands = None;
+                        let _ = events.try_send((generation, PlayerEvent::AudioLevel(None)));
+                    }
+                }
+            }
             _ = meter_tick.tick(), if meter_enabled && started && !paused && !buffering && meter_request.is_none() => {
-                meter_request = Some(session.command(json!(["get_property", "af-metadata/meter"])).await?);
+                match options.meter {
+                    Some(MeterMode::Bands) => {
+                        if let Some(bands) = latest_bands.take() {
+                            let _ = events.try_send((generation, PlayerEvent::AudioLevel(Some(AudioMeter::Bands(bands)))));
+                        }
+                    }
+                    Some(MeterMode::Loudness) => {
+                        meter_request = Some(session.command(json!(["get_property", "af-metadata/meter"])).await?);
+                    }
+                    None => {}
+                }
             }
             _ = watchdog.tick() => {
                 if !started && tokio::time::Instant::now() >= deadline { bail!("Stream did not start within 30 seconds"); }
@@ -271,12 +335,41 @@ fn audio_level(value: &Value) -> Option<f32> {
     if value["error"] != "success" {
         return None;
     }
-    let db = value["data"]["lavfi.astats.Overall.RMS_level"]
-        .as_str()?
-        .parse::<f32>()
-        .ok()?;
+    parse_db(value["data"]["lavfi.astats.Overall.RMS_level"].as_str()?)
+}
+
+fn parse_db(value: &str) -> Option<f32> {
+    let db: f32 = value.parse().ok()?;
     // FFmpeg reports -inf for digital silence; other non-finite values aren't levels.
     (db.is_finite() || db == f32::NEG_INFINITY).then_some(db)
+}
+
+#[derive(Default)]
+struct BandFrame([Option<f32>; 3]);
+
+impl BandFrame {
+    fn push(&mut self, line: &str) -> Option<[f32; 3]> {
+        if line.starts_with("frame:") {
+            self.0 = [None; 3];
+            return None;
+        }
+        let (channel, value) = line
+            .strip_prefix("lavfi.astats.")?
+            .split_once(".RMS_level=")?;
+        let index = match channel {
+            "1" => 0,
+            "2" => 1,
+            "3" => 2,
+            _ => return None,
+        };
+        self.0[index] = parse_db(value);
+        if let [Some(bass), Some(mids), Some(treble)] = self.0 {
+            self.0 = [None; 3];
+            Some([bass, mids, treble])
+        } else {
+            None
+        }
+    }
 }
 
 fn property_event(value: &Value) -> Option<PlayerEvent> {
@@ -325,6 +418,23 @@ mod tests {
         assert_eq!(audio_level(&json!({"error": "success", "data": {}})), None);
     }
 
+    #[test]
+    fn band_samples_require_three_levels_from_the_same_frame() {
+        let mut frame = BandFrame::default();
+        assert_eq!(frame.push("frame:0"), None);
+        assert_eq!(frame.push("lavfi.astats.1.RMS_level=-20"), None);
+        assert_eq!(frame.push("lavfi.astats.2.RMS_level=-5"), None);
+        assert_eq!(frame.push("frame:1"), None);
+        assert_eq!(frame.push("lavfi.astats.3.RMS_level=-33"), None);
+        assert_eq!(frame.push("lavfi.astats.1.RMS_level=-inf"), None);
+        assert_eq!(frame.push("lavfi.astats.2.RMS_level=NaN"), None);
+        assert_eq!(
+            frame.push("lavfi.astats.2.RMS_level=-22"),
+            Some([f32::NEG_INFINITY, -22.0, -33.0])
+        );
+        assert_eq!(frame.push("lavfi.astats.1.RMS_level=-20"), None);
+    }
+
     #[tokio::test]
     async fn missing_mpv_reports_actionable_error() {
         let (tx, mut rx) = mpsc::channel(8);
@@ -336,7 +446,7 @@ mod tests {
             PlaybackOptions {
                 volume: 70,
                 muted: false,
-                audio_meter: true,
+                meter: Some(MeterMode::Bands),
             },
             tx,
         );

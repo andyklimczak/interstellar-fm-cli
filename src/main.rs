@@ -181,7 +181,10 @@ impl Engine {
                 PlaybackOptions {
                     volume: app.library.volume,
                     muted: app.library.muted,
-                    audio_meter: app.config.audio_meter,
+                    meter: app
+                        .config
+                        .audio_meter
+                        .then_some(app.config.audio_meter_mode),
                 },
                 self.player_events.clone(),
             );

@@ -2,6 +2,7 @@
 # Every setting is optional.
 mpv_path = "mpv"
 audio_meter = true # Set to false to skip audio measurement and use a static play icon.
+audio_meter_mode = "bands" # "bands" (bass/mids/treble) or "loudness" (the previous meter).
 history_limit = 30
 debounce_ms = 350
 accent = "magenta" # magenta, cyan, green, blue, yellow, red

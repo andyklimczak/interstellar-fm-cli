@@ -40,11 +40,12 @@ and older saved entries show `—` for unknown counts rather than zero.
 
 ## Now Playing
 
-The bars in Now Playing show the stream's measured loudness (RMS), not separate frequency
-bands. They measure decoded audio before playback volume and mute, so the meter still
-responds when muted. Set `audio_meter = false` in `config.toml` to skip measurement.
-A static `▶` appears if measurement is disabled or unavailable, `Ⅱ` indicates pause,
-and connecting, buffering, reconnecting, and error states retain text labels.
+Now Playing shows three bars for bass, mids, and treble (left to right, split at
+200 Hz and 2.5 kHz, with analysis up to 12 kHz). The meter reads decoded audio
+before playback volume and mute. Set `audio_meter_mode = "loudness"` in `config.toml`
+to restore the previous single loudness meter, or `audio_meter = false` to disable
+measurement. A static `▶` appears if measurement is disabled or unavailable, `Ⅱ`
+indicates pause, and connection, buffering, and error states retain text labels.
 
 ## Add a stream or playlist
 

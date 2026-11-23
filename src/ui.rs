@@ -84,14 +84,29 @@ fn panel(title: &str, color: Color) -> Block<'_> {
         .border_style(Style::default().fg(color))
 }
 
+fn band_bar(db: f32) -> char {
+    const BARS: [char; 9] = ['·', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    BARS[((db + 54.0) / 5.5).clamp(0.0, 8.0) as usize]
+}
+
 fn playback_indicator(app: &App) -> Span<'static> {
+    use crate::player::AudioMeter;
     const METER: [&str; 6] = ["·····", "▂····", "▂▄···", "▂▄▅··", "▂▄▅▆·", "▂▄▅▆█"];
     const THRESHOLDS_DB: [f32; 5] = [-42.0, -32.0, -24.0, -18.0, -12.0];
+    let bands;
     let (label, color) = match app.playback.as_str() {
         "PLAYING" => {
-            let label = app.audio_level.map_or("▶", |db| {
-                METER[THRESHOLDS_DB.partition_point(|threshold| db >= *threshold)]
-            });
+            let label = match app.audio_level {
+                Some(AudioMeter::Bands(levels)) => {
+                    let [bass, mids, treble] = levels.map(band_bar);
+                    bands = format!("{bass} {mids} {treble}");
+                    bands.as_str()
+                }
+                Some(AudioMeter::Loudness(db)) => {
+                    METER[THRESHOLDS_DB.partition_point(|threshold| db >= *threshold)]
+                }
+                None => "▶",
+            };
             (label, Color::Green)
         }
         "PAUSED" => ("Ⅱ", Color::Yellow),
@@ -471,13 +486,17 @@ mod tests {
             crate::config::Config::default(),
             crate::model::Library::default(),
         );
+        use crate::player::AudioMeter::{Bands, Loudness};
         app.playback = "PLAYING".into();
         for (level, symbol) in [
             (None, "▶"),
-            (Some(f32::NEG_INFINITY), "·····"),
-            (Some(-40.0), "▂····"),
-            (Some(-20.0), "▂▄▅··"),
-            (Some(-8.0), "▂▄▅▆█"),
+            (Some(Loudness(f32::NEG_INFINITY)), "·····"),
+            (Some(Loudness(-40.0)), "▂····"),
+            (Some(Loudness(-20.0)), "▂▄▅··"),
+            (Some(Loudness(-8.0)), "▂▄▅▆█"),
+            (Some(Bands([-10.0, f32::NEG_INFINITY, -32.0])), "█ · ▄"),
+            (Some(Bands([-32.0, -10.0, f32::NEG_INFINITY])), "▄ █ ·"),
+            (Some(Bands([f32::NEG_INFINITY, -32.0, -10.0])), "· ▄ █"),
         ] {
             app.audio_level = level;
             let indicator = playback_indicator(&app);

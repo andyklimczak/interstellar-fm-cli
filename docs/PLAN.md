@@ -62,7 +62,7 @@ Always show Saved / History / Search as top tabs, with a full-width station tabl
 │ > ★ Jazz Radio            FR         128 kbps    12k    68k   │
 │     Jazz24                US         128 kbps   4.3k    23k   │
 ├───────────────────────────────────────────────────────────────┤
-│ ▂▄▅··    Jazz Radio · Artist — Track, when available           │
+│ ▅ ▄ ▂    Jazz Radio · Artist — Track, when available           │
 │ LIVE · MP3 128 kbps                     Volume: 70%            │
 └───────────────────────────────────────────────────────────────┘
 ```
@@ -72,7 +72,7 @@ Always show Saved / History / Search as top tabs, with a full-width station tabl
 - Distinguish the selected row from the currently playing station.
 - Preserve each section's selection and scroll position independently.
 - Search input and sort controls appear in Search; Saved/History can have a local filter instead.
-- Now Playing panel: station, measured stream loudness while playing and a static `Ⅱ` when paused; retain text labels for connecting/buffering/reconnecting/error states. Poll mpv's RMS metadata at ~7 Hz, with a static play icon when measurement is disabled or unavailable. Show available ICY metadata, live indicator, volume, and mute state. Do not show a misleading track progress bar.
+- Now Playing panel: station, measured bass/mids/treble bars or an optional single loudness meter while playing (about 7 updates/sec), and a static `Ⅱ` when paused. Keep text labels for connecting/buffering/reconnecting/error states and use a static play icon when measurement is disabled or unavailable. Show available ICY metadata, live indicator, volume, and mute state. Do not show a misleading track progress bar.
 - No routine footer: a top-right help hint and a help overlay generated from the active keymap. Show station counts in table titles; only reserve a status line when there is an error or action feedback.
 - Station details popup: country, language, votes/clicks, tags, homepage, codec, bitrate, and stream URL.
 - At narrow widths, retain the top tabs and drop lower-priority table columns. At very small sizes, show a resize message without panicking.

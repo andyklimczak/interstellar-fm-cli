@@ -10,6 +10,7 @@ import fcntl
 import http.server
 import io
 import json
+import math
 import os
 from pathlib import Path
 import pty
@@ -31,6 +32,7 @@ BINARY = Path(__file__).resolve().parents[1] / "target/debug/interstellarfm-cli"
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--codecs", action="store_true", help="Also test MP3, AAC, Ogg, and HLS (requires ffmpeg)")
+    parser.add_argument("--meter-mode", choices=["bands", "loudness"], default="bands")
     args = parser.parse_args()
     if not BINARY.exists():
         raise SystemExit("Run cargo build first")
@@ -43,12 +45,13 @@ def main():
         with wave.open(audio, "wb") as wav:
             wav.setnchannels(1)
             wav.setsampwidth(2)
-            wav.setframerate(8000)
-            # Alternate quiet and loud tones to check real meter movement.
-            def tone(amplitude, seconds):
-                period = struct.pack("<20h", *([amplitude] * 10 + [-amplitude] * 10))
-                return period * (400 * seconds)
-            wav.writeframes((tone(600, 2) + tone(12000, 2)) * 30)
+            rate = 24000
+            wav.setframerate(rate)
+            # Quiet bass followed by loud mids and treble.
+            def tone(amplitude, hz):
+                samples = (round(amplitude * math.sin(math.tau * hz * i / rate)) for i in range(rate))
+                return struct.pack(f"<{rate}h", *samples) * 2
+            wav.writeframes((tone(600, 80) + tone(26000, 800) + tone(26000, 5000)) * 20)
         streams = {"/live.wav": ("audio/wav", audio.getvalue())}
         if args.codecs:
             ffmpeg = shutil.which("ffmpeg")
@@ -86,7 +89,7 @@ def main():
         wrapper.write_text(f'#!/bin/sh\necho $$ >> "{root}/player-pids"\nexec "{mpv}" --ao=null "$@"\n')
         wrapper.chmod(0o700)
         config = root / "config.toml"
-        config.write_text(f'mpv_path = "{wrapper}"\n')
+        config.write_text(f'mpv_path = "{wrapper}"\naudio_meter_mode = "{args.meter_mode}"\n')
         library_path = root / "data/library.json"
         transcript = bytearray()
         pid, fd = pty.fork()
