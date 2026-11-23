@@ -58,9 +58,9 @@ Always show Saved / History / Search as top tabs, with a full-width station tabl
 │ 1 Saved | 2 History | 3 Search                                │
 ├───────────────────────────────────────────────────────────────┤
 │ Search: jazz                                  Sort: Votes     │
-│   Station                          Country   Votes   Clicks   │
-│ > ★ Jazz Radio                     France       12k     68k   │
-│     Jazz24                         USA         4.3k     23k   │
+│   Station                 Country     Bitrate  Votes  Clicks  │
+│ > ★ Jazz Radio            France     128 kbps    12k    68k   │
+│     Jazz24                USA        128 kbps   4.3k    23k   │
 ├───────────────────────────────────────────────────────────────┤
 │ PLAYING  Jazz Radio · Artist — Track, when available           │
 │ LIVE · MP3 128 kbps                     Volume: 70%            │
@@ -68,7 +68,7 @@ Always show Saved / History / Search as top tabs, with a full-width station tabl
 ```
 
 - Top tabs: Saved / History / Search, at every terminal width. Underline the active tab when navigation has focus.
-- Main pane: table with saved marker, station name, country, Votes, and Clicks. Show right-aligned compact counts (`23k`, `2.3k`, `1.2m`), keeping exact counts with thousands separators in station details; keep Votes on narrow terminals and hide Clicks/country when needed. Codec/bitrate stay in station details. Unknown counts (custom streams and legacy snapshots) display as `—`, not zero. Counts persist in saved/History snapshots and update when directory responses provide fresh values. Add last-played time in History when space allows.
+- Main pane: table with saved marker, station name, country, Bitrate, Votes, and Clicks. Show bitrate in kbps at widths of 85 columns or more, using `—` when unknown. Show right-aligned compact counts (`23k`, `2.3k`, `1.2m`), keeping exact counts with thousands separators in station details; keep Votes on narrow terminals and hide Bitrate/Clicks/country when needed. Codec stays in station details. Unknown counts (custom streams and legacy snapshots) display as `—`, not zero. Counts persist in saved/History snapshots and update when directory responses provide fresh values. Add last-played time in History when space allows.
 - Distinguish the selected row from the currently playing station.
 - Preserve each section's selection and scroll position independently.
 - Search input and sort controls appear in Search; Saved/History can have a local filter instead.

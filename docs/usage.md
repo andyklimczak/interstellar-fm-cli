@@ -16,7 +16,8 @@
 Votes indicate explicit community approval. Clicks indicate Radio Browser station
 selections, **not actual listener counts**; neither guarantees audio quality.
 The table uses rounded compact counts: `23,059` → `23k`, `2,300` → `2.3k`, and
-`1,200,000` → `1.2m`. Press `i` for exact counts and codec/bitrate details.
+`1,200,000` → `1.2m`. Bitrate appears in kbps on terminals at least 85 columns wide;
+unknown bitrates display as `—`. Press `i` for exact counts and codec/bitrate details.
 Narrow terminals prioritize Votes and hide Clicks/country when needed.
 
 ## Favorites and History

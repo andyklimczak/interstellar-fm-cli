@@ -176,6 +176,13 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             if main.width >= 70 {
                 cells.push(Cell::from(clean(&s.country)));
             }
+            if main.width >= 85 {
+                cells.push(right(if s.bitrate == 0 {
+                    "—".into()
+                } else {
+                    format!("{} kbps", s.bitrate)
+                }));
+            }
             cells.push(right(count(s.votes)));
             if main.width >= 60 {
                 cells.push(right(count(s.clicks)));
@@ -192,6 +199,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     if main.width >= 70 {
         headers.push(Cell::from("Country"));
         widths.push(Constraint::Length(17));
+    }
+    if main.width >= 85 {
+        headers.push(right("Bitrate".into()));
+        widths.push(Constraint::Length(9));
     }
     headers.push(right("Votes".into()));
     widths.push(Constraint::Length(7));
@@ -470,7 +481,7 @@ mod tests {
     }
 
     #[test]
-    fn table_shows_votes_and_clicks_instead_of_technical_columns() {
+    fn table_shows_votes_clicks_and_bitrate_when_space_allows() {
         let mut app = App::new(
             crate::config::Config::default(),
             crate::model::Library::default(),
@@ -485,13 +496,19 @@ mod tests {
         station.codec = "AAC".into();
         station.bitrate = 128;
         app.library.add(station.clone());
-        for width in [120, 60, 36] {
+        for width in [120, 85, 84, 70, 60, 36] {
             let text = screen(&mut app, width);
             assert!(text.contains("Votes"));
             assert!(text.contains("12k"));
             assert!(!text.contains("Codec"));
             assert!(!text.contains("AAC"));
-            assert!(!text.contains("kbps"));
+            if width >= 85 {
+                assert!(text.contains("Bitrate"));
+                assert!(text.contains("128 kbps"));
+            } else {
+                assert!(!text.contains("Bitrate"));
+                assert!(!text.contains("kbps"));
+            }
             if width >= 60 {
                 assert!(text.contains("Clicks"));
                 assert!(text.contains("68k"));
@@ -508,7 +525,7 @@ mod tests {
     }
 
     #[test]
-    fn custom_streams_show_unknown_counts_instead_of_zero() {
+    fn custom_streams_show_unknown_bitrate_and_counts_instead_of_zero() {
         let mut app = App::new(
             crate::config::Config::default(),
             crate::model::Library::default(),
@@ -521,7 +538,9 @@ mod tests {
         let text = screen(&mut app, 120);
         assert!(text.contains("Votes"));
         assert!(text.contains("Clicks"));
-        assert_eq!(text.matches('—').count(), 2);
+        assert!(text.contains("Bitrate"));
+        assert!(!text.contains("0 kbps"));
+        assert_eq!(text.matches('—').count(), 3);
     }
 
     #[test]
