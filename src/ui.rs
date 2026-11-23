@@ -85,7 +85,8 @@ fn panel(title: &str, color: Color) -> Block<'_> {
 }
 
 fn band_bar(db: f32) -> char {
-    const BARS: [char; 9] = ['·', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    // Braille dots leave a small, font-dependent gap without using a blank cell.
+    const BARS: [char; 9] = ['·', '⡀', '⣀', '⣄', '⣤', '⣦', '⣶', '⣷', '⣿'];
     BARS[((db + 54.0) / 5.5).clamp(0.0, 8.0) as usize]
 }
 
@@ -494,9 +495,9 @@ mod tests {
             (Some(Loudness(-40.0)), "▂····"),
             (Some(Loudness(-20.0)), "▂▄▅··"),
             (Some(Loudness(-8.0)), "▂▄▅▆█"),
-            (Some(Bands([-10.0, f32::NEG_INFINITY, -32.0])), "█·▄"),
-            (Some(Bands([-32.0, -10.0, f32::NEG_INFINITY])), "▄█·"),
-            (Some(Bands([f32::NEG_INFINITY, -32.0, -10.0])), "·▄█"),
+            (Some(Bands([-10.0, f32::NEG_INFINITY, -32.0])), "⣿·⣤"),
+            (Some(Bands([-32.0, -10.0, f32::NEG_INFINITY])), "⣤⣿·"),
+            (Some(Bands([f32::NEG_INFINITY, -32.0, -10.0])), "·⣤⣿"),
         ] {
             app.audio_level = level;
             let indicator = playback_indicator(&app);

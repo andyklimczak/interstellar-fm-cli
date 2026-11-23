@@ -154,8 +154,9 @@ def main():
             send("p")
             wait_for(lambda: len(library().get("history", [])) == 1, "successful mpv playback/history")
             assert len(library()["favorites"]) == 1
-            wait_for(lambda: "▂".encode() in transcript, "quiet tone registers on the audio meter")
-            wait_for(lambda: "█".encode() in transcript, "loud tone fills the audio meter")
+            quiet, loud = ("⣀", "⣿") if args.meter_mode == "bands" else ("▂", "█")
+            wait_for(lambda: quiet.encode() in transcript, "quiet tone registers on the audio meter")
+            wait_for(lambda: loud.encode() in transcript, "loud tone fills the audio meter")
             send("p")
             wait_for(lambda: player_property("pause") is True, "pause")
             wait_for(lambda: "Ⅱ".encode() in transcript, "pause indicator")
