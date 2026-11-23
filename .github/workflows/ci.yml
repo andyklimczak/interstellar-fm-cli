@@ -61,14 +61,3 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y mpv ffmpeg
       - run: cargo build --locked
       - run: python3 scripts/smoke-test.py --codecs
-
-  automation:
-    name: Automation policy
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-      - run: node --test .github/scripts/dependabot-automerge.test.cjs

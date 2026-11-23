@@ -35,7 +35,7 @@ left for manual review.
 Before merging, it rechecks the CI run/attempt and matches the PR's current head SHA
 to the tested SHA. The merge API also pins that SHA, so a subsequent update cannot
 bypass CI. Only trusted default-branch workflow code is checked out; PR code is never
-executed with the PAT. The automation policy has offline Node.js tests.
+executed with the PAT.
 
 This merges directly **after passing CI**, rather than merely enabling GitHub's native
 "auto-merge" setting. It therefore also works for private repositories whose GitHub
@@ -44,14 +44,15 @@ protection and additional approval requirements still apply; they are never bypa
 
 If a token is missing/expired, the merge fails safely and the PR stays open. After
 fixing the secret, rerun the failed auto-merge job. A newer PR head needs a fresh
-passing CI run before it can merge.
+passing CI run before it can merge. Auto-merge runs skipped after ordinary pushes
+to `master` are expected: only successful Dependabot PR CI runs qualify.
 
 ## Rust CI
 
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on pushes and PRs:
 formatting, Clippy with warnings denied, locked tests/release build, the local
-MP3/AAC/Ogg/HLS playback smoke test, and the automation policy tests. Public radio
-search tests and README screenshot capture remain opt-in, not CI requirements.
+MP3/AAC/Ogg/HLS playback smoke test. Public radio search tests and README screenshot
+capture remain opt-in, not CI requirements.
 
 If renaming **Rust CI** or its workflow path, also update the auto-merge trigger and
 policy check so CI gating remains effective.
