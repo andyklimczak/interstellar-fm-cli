@@ -43,6 +43,25 @@ fn fixture() -> (Engine, App, Station) {
 }
 
 #[test]
+fn playback_animation_ticks_and_pause_resume_preserve_history() {
+    let (mut engine, mut app, _) = fixture();
+    engine.player_event(&mut app, 4, PlayerEvent::Started);
+    for _ in 0..3 {
+        engine.tick(&mut app);
+    }
+    assert_eq!(app.animation_tick, 3);
+    assert_eq!(app.playback, "PLAYING");
+    engine.player_event(&mut app, 4, PlayerEvent::Paused(true));
+    engine.tick(&mut app);
+    assert!(app.paused);
+    assert_eq!(app.playback, "PAUSED");
+    engine.player_event(&mut app, 4, PlayerEvent::Paused(false));
+    assert!(!app.paused);
+    assert_eq!(app.playback, "PLAYING");
+    assert_eq!(app.library.history.len(), 1);
+}
+
+#[test]
 fn only_successful_current_attempt_records_history() {
     let (mut engine, mut app, station) = fixture();
     engine.player_event(&mut app, 3, PlayerEvent::Started);

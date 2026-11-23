@@ -147,8 +147,10 @@ def main():
             send("p")
             wait_for(lambda: len(library().get("history", [])) == 1, "successful mpv playback/history")
             assert len(library()["favorites"]) == 1
+            wait_for(lambda: any(bar.encode() in transcript for bar in "▁▂▃▄▅▆▇█"), "playing equalizer")
             send("p")
             wait_for(lambda: player_property("pause") is True, "pause")
+            wait_for(lambda: "Ⅱ".encode() in transcript, "pause indicator")
             send("p")
             wait_for(lambda: player_property("pause") is False, "resume")
             send("+")

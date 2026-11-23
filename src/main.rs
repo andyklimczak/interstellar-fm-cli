@@ -282,6 +282,7 @@ impl Engine {
         }
     }
     fn tick(&mut self, app: &mut App) {
+        app.animation_tick = app.animation_tick.wrapping_add(1);
         if app.search_due.is_some_and(|due| Instant::now() >= due) {
             app.search_due = None;
             self.effect(app, Effect::Search);

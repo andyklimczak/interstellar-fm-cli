@@ -38,6 +38,12 @@ Favorites, History, volume, and mute persist across restarts. Counts are last-kn
 snapshots, refreshed when a station appears in a new directory response. Custom streams
 and older saved entries show `—` for unknown counts rather than zero.
 
+## Now Playing
+
+Moving equalizer bars indicate playback; a static `Ⅱ` indicates pause. The bars are
+an animation of playback status, **not measured audio levels**, and still move when
+muted. Connecting, buffering, reconnecting, and error states retain text labels.
+
 ## Add a stream or playlist
 
 1. Press `a` and enter an HTTP/HTTPS stream URL, a URL ending in `.pls`, or a local `.pls` path (`~/...` is supported).

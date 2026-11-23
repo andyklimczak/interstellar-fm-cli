@@ -84,6 +84,37 @@ fn panel(title: &str, color: Color) -> Block<'_> {
         .border_style(Style::default().fg(color))
 }
 
+fn playback_indicator(app: &App) -> Span<'static> {
+    const FRAMES: [&str; 8] = [
+        "▁▃▆▄▂",
+        "▂▅█▆▃",
+        "▄▇▅▃▁",
+        "▆▄▂▄▆",
+        "▃▁▄▇▅",
+        "▁▄▇▅▂",
+        "▃▆▄▂▄",
+        "▅▃▁▃▆",
+    ];
+    let (label, color) = match app.playback.as_str() {
+        // The existing event-loop tick is 50 ms; animate at a quieter 150 ms.
+        "PLAYING" => (
+            FRAMES[(app.animation_tick / 3 % FRAMES.len() as u64) as usize],
+            Color::Green,
+        ),
+        "PAUSED" => ("Ⅱ", Color::Yellow),
+        "ERROR" => ("ERROR", Color::Red),
+        "IDLE" => ("IDLE", Color::DarkGray),
+        "STOPPED" => ("STOPPED", Color::DarkGray),
+        state => (state, Color::Yellow),
+    };
+    // Keep the station name aligned when switching between bars and pause.
+    let padding = 5usize.saturating_sub(Line::from(label).width()) + 2;
+    Span::styled(
+        format!("{label}{}", " ".repeat(padding)),
+        Style::default().fg(color).add_modifier(Modifier::BOLD),
+    )
+}
+
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let size = frame.area();
     if size.width < 36 || size.height < 18 {
@@ -268,17 +299,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         &app.metadata
     };
     let player = vec![
-        Line::from(vec![
-            Span::styled(
-                format!("{}  ", app.playback),
-                Style::default().fg(if app.playback == "ERROR" {
-                    Color::Red
-                } else {
-                    Color::Green
-                }),
-            ),
-            Span::raw(current),
-        ]),
+        Line::from(vec![playback_indicator(app), Span::raw(current)]),
         Line::from(format!(
             "{} · Volume {}%{}",
             clean(metadata),
@@ -449,6 +470,46 @@ mod tests {
             .iter()
             .map(|cell| cell.symbol())
             .collect()
+    }
+
+    #[test]
+    fn equalizer_animates_only_while_playing_and_pause_keeps_the_name_aligned() {
+        let mut app = App::new(
+            crate::config::Config::default(),
+            crate::model::Library::default(),
+        );
+        app.playback = "PLAYING".into();
+        let first = playback_indicator(&app);
+        app.animation_tick = 2;
+        assert_eq!(playback_indicator(&app).content, first.content);
+        app.animation_tick = 3;
+        assert_ne!(playback_indicator(&app).content, first.content);
+        app.animation_tick = 24;
+        assert_eq!(playback_indicator(&app).content, first.content);
+        assert!(!first.content.contains("PLAYING"));
+        assert_eq!(first.style.fg, Some(Color::Green));
+        for state in [
+            "PAUSED",
+            "CONNECTING",
+            "BUFFERING",
+            "RECONNECTING 1/2",
+            "ERROR",
+            "IDLE",
+            "STOPPED",
+        ] {
+            app.playback = state.into();
+            app.animation_tick = 0;
+            let before = playback_indicator(&app);
+            app.animation_tick = 9;
+            assert_eq!(playback_indicator(&app).content, before.content);
+            if state == "PAUSED" {
+                assert_eq!(before.content.trim(), "Ⅱ");
+                assert_eq!(before.width(), first.width());
+                assert_eq!(before.style.fg, Some(Color::Yellow));
+            } else {
+                assert_eq!(before.content.trim(), state);
+            }
+        }
     }
 
     #[test]

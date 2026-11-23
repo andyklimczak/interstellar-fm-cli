@@ -62,7 +62,7 @@ Always show Saved / History / Search as top tabs, with a full-width station tabl
 │ > ★ Jazz Radio            FR         128 kbps    12k    68k   │
 │     Jazz24                US         128 kbps   4.3k    23k   │
 ├───────────────────────────────────────────────────────────────┤
-│ PLAYING  Jazz Radio · Artist — Track, when available           │
+│ ▁▃▆▄▂    Jazz Radio · Artist — Track, when available           │
 │ LIVE · MP3 128 kbps                     Volume: 70%            │
 └───────────────────────────────────────────────────────────────┘
 ```
@@ -72,7 +72,7 @@ Always show Saved / History / Search as top tabs, with a full-width station tabl
 - Distinguish the selected row from the currently playing station.
 - Preserve each section's selection and scroll position independently.
 - Search input and sort controls appear in Search; Saved/History can have a local filter instead.
-- Bottom player: station, playback/buffering/error state, available ICY metadata, live indicator, volume, and mute state. Do not show a misleading track progress bar.
+- Now Playing panel: station, animated equalizer bars while playing and a static `Ⅱ` when paused; retain text labels for connecting/buffering/reconnecting/error states. The animation indicates playback status, not measured audio levels. Show available ICY metadata, live indicator, volume, and mute state. Do not show a misleading track progress bar.
 - No routine footer: a top-right help hint and a help overlay generated from the active keymap. Show station counts in table titles; only reserve a status line when there is an error or action feedback.
 - Station details popup: country, language, votes/clicks, tags, homepage, codec, bitrate, and stream URL.
 - At narrow widths, retain the top tabs and drop lower-priority table columns. At very small sizes, show a resize message without panicking.
