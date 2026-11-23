@@ -43,21 +43,27 @@ fn fixture() -> (Engine, App, Station) {
 }
 
 #[test]
-fn playback_animation_ticks_and_pause_resume_preserve_history() {
+fn audio_levels_are_isolated_by_session_and_playback_state() {
     let (mut engine, mut app, _) = fixture();
+    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(-20.0)));
+    assert_eq!(app.audio_level, None);
     engine.player_event(&mut app, 4, PlayerEvent::Started);
-    for _ in 0..3 {
-        engine.tick(&mut app);
-    }
-    assert_eq!(app.animation_tick, 3);
-    assert_eq!(app.playback, "PLAYING");
+    engine.player_event(&mut app, 3, PlayerEvent::AudioLevel(Some(-1.0)));
+    assert_eq!(app.audio_level, None);
+    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(-20.0)));
+    assert_eq!(app.audio_level, Some(-20.0));
     engine.player_event(&mut app, 4, PlayerEvent::Paused(true));
-    engine.tick(&mut app);
-    assert!(app.paused);
-    assert_eq!(app.playback, "PAUSED");
+    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(-10.0)));
+    assert_eq!(app.audio_level, None);
     engine.player_event(&mut app, 4, PlayerEvent::Paused(false));
-    assert!(!app.paused);
-    assert_eq!(app.playback, "PLAYING");
+    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(-12.0)));
+    assert_eq!(app.audio_level, Some(-12.0));
+    engine.player_event(&mut app, 4, PlayerEvent::Buffering(true));
+    assert_eq!(app.audio_level, None);
+    engine.player_event(&mut app, 4, PlayerEvent::Buffering(false));
+    engine.player_event(&mut app, 4, PlayerEvent::AudioLevel(Some(-15.0)));
+    engine.effect(&mut app, Effect::Stop);
+    assert_eq!(app.audio_level, None);
     assert_eq!(app.library.history.len(), 1);
 }
 

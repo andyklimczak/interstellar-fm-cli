@@ -10,6 +10,7 @@ use std::{
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub mpv_path: String,
+    pub audio_meter: bool,
     pub history_limit: usize,
     pub debounce_ms: u64,
     pub api_base: Option<String>,
@@ -20,6 +21,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             mpv_path: "mpv".into(),
+            audio_meter: true,
             history_limit: 30,
             debounce_ms: 350,
             api_base: None,

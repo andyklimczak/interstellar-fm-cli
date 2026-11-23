@@ -40,9 +40,11 @@ and older saved entries show `—` for unknown counts rather than zero.
 
 ## Now Playing
 
-Moving equalizer bars indicate playback; a static `Ⅱ` indicates pause. The bars are
-an animation of playback status, **not measured audio levels**, and still move when
-muted. Connecting, buffering, reconnecting, and error states retain text labels.
+The bars in Now Playing show the stream's measured loudness (RMS), not separate frequency
+bands. They measure decoded audio before playback volume and mute, so the meter still
+responds when muted. Set `audio_meter = false` in `config.toml` to skip measurement.
+A static `▶` appears if measurement is disabled or unavailable, `Ⅱ` indicates pause,
+and connecting, buffering, reconnecting, and error states retain text labels.
 
 ## Add a stream or playlist
 

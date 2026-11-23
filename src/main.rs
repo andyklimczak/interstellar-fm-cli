@@ -21,7 +21,7 @@ use crossterm::{
 };
 use futures_util::StreamExt;
 use model::{Library, Station, StationId};
-use player::{Control, Player, PlayerEvent};
+use player::{Control, PlaybackOptions, Player, PlayerEvent};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::{
     io::{IsTerminal, stdout},
@@ -141,6 +141,7 @@ impl Engine {
                 self.generation += 1;
                 self.player.stop();
                 app.playback = "STOPPED".into();
+                app.audio_level = None;
                 app.paused = false;
                 app.metadata.clear();
             }
@@ -170,14 +171,18 @@ impl Engine {
         if let Some(station) = &app.current {
             self.generation += 1;
             app.playback = "CONNECTING".into();
+            app.audio_level = None;
             app.paused = false;
             app.metadata.clear();
             self.player.play(
                 app.config.mpv_path.clone(),
                 station.url.clone(),
                 self.generation,
-                app.library.volume,
-                app.library.muted,
+                PlaybackOptions {
+                    volume: app.library.volume,
+                    muted: app.library.muted,
+                    audio_meter: app.config.audio_meter,
+                },
                 self.player_events.clone(),
             );
         }
@@ -213,15 +218,27 @@ impl Engine {
                 app.paused = paused;
                 if self.attempt_started {
                     app.playback = if paused { "PAUSED" } else { "PLAYING" }.into();
+                    if paused {
+                        app.audio_level = None;
+                    }
                 }
             }
             PlayerEvent::Buffering(buffering) => {
                 if self.attempt_started && !app.paused {
                     app.playback = if buffering { "BUFFERING" } else { "PLAYING" }.into();
+                    if buffering {
+                        app.audio_level = None;
+                    }
                 }
             }
             PlayerEvent::Metadata(text) => app.metadata = text,
+            PlayerEvent::AudioLevel(level) => {
+                if app.playback == "PLAYING" {
+                    app.audio_level = level;
+                }
+            }
             PlayerEvent::Failed(error) => {
+                app.audio_level = None;
                 app.message = model::clean(&error);
                 app.paused = false;
                 if self.retries < 2 && !error.contains("Cannot start mpv") {
@@ -282,7 +299,6 @@ impl Engine {
         }
     }
     fn tick(&mut self, app: &mut App) {
-        app.animation_tick = app.animation_tick.wrapping_add(1);
         if app.search_due.is_some_and(|due| Instant::now() >= due) {
             app.search_due = None;
             self.effect(app, Effect::Search);

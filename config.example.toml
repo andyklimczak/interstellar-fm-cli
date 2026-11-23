@@ -1,6 +1,7 @@
 # Copy to ~/.config/interstellarfm-cli/config.toml (or use --config PATH).
 # Every setting is optional.
 mpv_path = "mpv"
+audio_meter = true # Set to false to skip audio measurement and use a static play icon.
 history_limit = 30
 debounce_ms = 350
 accent = "magenta" # magenta, cyan, green, blue, yellow, red

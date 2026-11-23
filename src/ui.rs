@@ -85,22 +85,15 @@ fn panel(title: &str, color: Color) -> Block<'_> {
 }
 
 fn playback_indicator(app: &App) -> Span<'static> {
-    const FRAMES: [&str; 8] = [
-        "▁▃▆▄▂",
-        "▂▅█▆▃",
-        "▄▇▅▃▁",
-        "▆▄▂▄▆",
-        "▃▁▄▇▅",
-        "▁▄▇▅▂",
-        "▃▆▄▂▄",
-        "▅▃▁▃▆",
-    ];
+    const METER: [&str; 6] = ["·····", "▂····", "▂▄···", "▂▄▅··", "▂▄▅▆·", "▂▄▅▆█"];
+    const THRESHOLDS_DB: [f32; 5] = [-42.0, -32.0, -24.0, -18.0, -12.0];
     let (label, color) = match app.playback.as_str() {
-        // The existing event-loop tick is 50 ms; animate at a quieter 150 ms.
-        "PLAYING" => (
-            FRAMES[(app.animation_tick / 3 % FRAMES.len() as u64) as usize],
-            Color::Green,
-        ),
+        "PLAYING" => {
+            let label = app.audio_level.map_or("▶", |db| {
+                METER[THRESHOLDS_DB.partition_point(|threshold| db >= *threshold)]
+            });
+            (label, Color::Green)
+        }
         "PAUSED" => ("Ⅱ", Color::Yellow),
         "ERROR" => ("ERROR", Color::Red),
         "IDLE" => ("IDLE", Color::DarkGray),
@@ -473,21 +466,25 @@ mod tests {
     }
 
     #[test]
-    fn equalizer_animates_only_while_playing_and_pause_keeps_the_name_aligned() {
+    fn measured_rms_drives_the_meter_only_while_playing() {
         let mut app = App::new(
             crate::config::Config::default(),
             crate::model::Library::default(),
         );
         app.playback = "PLAYING".into();
-        let first = playback_indicator(&app);
-        app.animation_tick = 2;
-        assert_eq!(playback_indicator(&app).content, first.content);
-        app.animation_tick = 3;
-        assert_ne!(playback_indicator(&app).content, first.content);
-        app.animation_tick = 24;
-        assert_eq!(playback_indicator(&app).content, first.content);
-        assert!(!first.content.contains("PLAYING"));
-        assert_eq!(first.style.fg, Some(Color::Green));
+        for (level, symbol) in [
+            (None, "▶"),
+            (Some(f32::NEG_INFINITY), "·····"),
+            (Some(-40.0), "▂····"),
+            (Some(-20.0), "▂▄▅··"),
+            (Some(-8.0), "▂▄▅▆█"),
+        ] {
+            app.audio_level = level;
+            let indicator = playback_indicator(&app);
+            assert_eq!(indicator.content.trim(), symbol);
+            assert_eq!(indicator.style.fg, Some(Color::Green));
+            assert_eq!(indicator.width(), 7);
+        }
         for state in [
             "PAUSED",
             "CONNECTING",
@@ -498,16 +495,13 @@ mod tests {
             "STOPPED",
         ] {
             app.playback = state.into();
-            app.animation_tick = 0;
-            let before = playback_indicator(&app);
-            app.animation_tick = 9;
-            assert_eq!(playback_indicator(&app).content, before.content);
+            let indicator = playback_indicator(&app);
             if state == "PAUSED" {
-                assert_eq!(before.content.trim(), "Ⅱ");
-                assert_eq!(before.width(), first.width());
-                assert_eq!(before.style.fg, Some(Color::Yellow));
+                assert_eq!(indicator.content.trim(), "Ⅱ");
+                assert_eq!(indicator.width(), 7);
+                assert_eq!(indicator.style.fg, Some(Color::Yellow));
             } else {
-                assert_eq!(before.content.trim(), state);
+                assert_eq!(indicator.content.trim(), state);
             }
         }
     }

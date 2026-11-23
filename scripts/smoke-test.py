@@ -44,7 +44,11 @@ def main():
             wav.setnchannels(1)
             wav.setsampwidth(2)
             wav.setframerate(8000)
-            wav.writeframes(b"\0\0" * 8000 * 120)
+            # Alternate quiet and loud tones to check real meter movement.
+            def tone(amplitude, seconds):
+                period = struct.pack("<20h", *([amplitude] * 10 + [-amplitude] * 10))
+                return period * (400 * seconds)
+            wav.writeframes((tone(600, 2) + tone(12000, 2)) * 30)
         streams = {"/live.wav": ("audio/wav", audio.getvalue())}
         if args.codecs:
             ffmpeg = shutil.which("ffmpeg")
@@ -147,7 +151,8 @@ def main():
             send("p")
             wait_for(lambda: len(library().get("history", [])) == 1, "successful mpv playback/history")
             assert len(library()["favorites"]) == 1
-            wait_for(lambda: any(bar.encode() in transcript for bar in "▁▂▃▄▅▆▇█"), "playing equalizer")
+            wait_for(lambda: "▂".encode() in transcript, "quiet tone registers on the audio meter")
+            wait_for(lambda: "█".encode() in transcript, "loud tone fills the audio meter")
             send("p")
             wait_for(lambda: player_property("pause") is True, "pause")
             wait_for(lambda: "Ⅱ".encode() in transcript, "pause indicator")

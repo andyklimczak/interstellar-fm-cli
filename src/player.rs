@@ -18,6 +18,7 @@ pub enum PlayerEvent {
     Paused(bool),
     Buffering(bool),
     Metadata(String),
+    AudioLevel(Option<f32>),
     Failed(String),
 }
 #[derive(Debug)]
@@ -26,6 +27,12 @@ pub enum Control {
     Volume(u8),
     Mute(bool),
     Quit,
+}
+
+pub struct PlaybackOptions {
+    pub volume: u8,
+    pub muted: bool,
+    pub audio_meter: bool,
 }
 
 #[derive(Default)]
@@ -39,8 +46,7 @@ impl Player {
         path: String,
         url: String,
         generation: u64,
-        volume: u8,
-        muted: bool,
+        options: PlaybackOptions,
         events: mpsc::Sender<(u64, PlayerEvent)>,
     ) {
         // A fresh child per station isolates late mpv events from a replacement stream.
@@ -50,8 +56,7 @@ impl Player {
         let (tx, rx) = mpsc::channel(32);
         self.commands = Some(tx);
         self.task = Some(tokio::spawn(async move {
-            if let Err(error) =
-                session(&path, &url, volume, muted, rx, generation, events.clone()).await
+            if let Err(error) = session(&path, &url, options, rx, generation, events.clone()).await
             {
                 let _ = events
                     .send((generation, PlayerEvent::Failed(format!("{error:#}"))))
@@ -148,7 +153,7 @@ impl Session {
             _dir: dir,
         })
     }
-    async fn command(&mut self, command: Value) -> Result<()> {
+    async fn command(&mut self, command: Value) -> Result<u64> {
         self.next_id += 1;
         let mut bytes =
             serde_json::to_vec(&json!({"command": command, "request_id": self.next_id}))?;
@@ -156,15 +161,14 @@ impl Session {
         tokio::time::timeout(Duration::from_secs(2), self.writer.write_all(&bytes))
             .await
             .context("mpv command timed out")??;
-        Ok(())
+        Ok(self.next_id)
     }
 }
 
 async fn session(
     path: &str,
     url: &str,
-    volume: u8,
-    muted: bool,
+    options: PlaybackOptions,
     mut commands: mpsc::Receiver<Control>,
     generation: u64,
     events: mpsc::Sender<(u64, PlayerEvent)>,
@@ -180,22 +184,34 @@ async fn session(
             .await?;
     }
     session
-        .command(json!(["set_property", "volume", volume]))
+        .command(json!(["set_property", "volume", options.volume]))
         .await?;
     session
-        .command(json!(["set_property", "mute", muted]))
+        .command(json!(["set_property", "mute", options.muted]))
         .await?;
+    let mut meter_setup = if options.audio_meter {
+        // Measure just RMS on the decoded audio; the filter passes audio through.
+        Some(session.command(json!(["af", "add", "@meter:lavfi=[astats=metadata=1:reset=1:measure_perchannel=none:measure_overall=RMS_level]"])).await?)
+    } else {
+        None
+    };
     session.command(json!(["loadfile", url, "replace"])).await?;
     let mut started = false;
+    let mut paused = false;
+    let mut buffering = false;
+    let mut meter_enabled = false;
+    let mut meter_request = None;
+    let mut meter_tick = tokio::time::interval(Duration::from_millis(150));
+    meter_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut watchdog = tokio::time::interval(Duration::from_secs(1));
     let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
     loop {
         tokio::select! {
             command = commands.recv() => {
                 match command {
-                    Some(Control::Pause) => session.command(json!(["cycle", "pause"])).await?,
-                    Some(Control::Volume(value)) => session.command(json!(["set_property", "volume", value])).await?,
-                    Some(Control::Mute(value)) => session.command(json!(["set_property", "mute", value])).await?,
+                    Some(Control::Pause) => { session.command(json!(["cycle", "pause"])).await?; }
+                    Some(Control::Volume(value)) => { session.command(json!(["set_property", "volume", value])).await?; }
+                    Some(Control::Mute(value)) => { session.command(json!(["set_property", "mute", value])).await?; }
                     Some(Control::Quit) | None => {
                         let _ = session.command(json!(["quit"])).await;
                         let _ = tokio::time::timeout(Duration::from_secs(1), session.child.wait()).await;
@@ -206,8 +222,22 @@ async fn session(
             line = session.lines.next_line() => {
                 let Some(line) = line? else { bail!("mpv disconnected; press Enter to retry"); };
                 let value: Value = serde_json::from_str(&line).context("Invalid mpv IPC response")?;
-                if let Some(error) = value.get("error").and_then(Value::as_str)
-                    && error != "success" { bail!("mpv: {error}"); }
+                let request_id = value["request_id"].as_u64();
+                let error = value["error"].as_str();
+                if request_id.is_some() && request_id == meter_setup {
+                    meter_setup = None;
+                    meter_enabled = error == Some("success");
+                    continue;
+                }
+                if request_id.is_some() && request_id == meter_request {
+                    meter_request = None;
+                    if !paused && !buffering {
+                        // Meter telemetry is optional and must never delay playback/control events.
+                        let _ = events.try_send((generation, PlayerEvent::AudioLevel(audio_level(&value))));
+                    }
+                    continue;
+                }
+                if let Some(error) = error && error != "success" { bail!("mpv: {error}"); }
                 let event = match value["event"].as_str() {
                     Some("playback-restart") if !started => { started = true; Some(PlayerEvent::Started) }
                     Some("end-file") => {
@@ -217,7 +247,17 @@ async fn session(
                     Some("property-change") => property_event(&value),
                     _ => None,
                 };
-                if let Some(event) = event { let _ = events.send((generation, event)).await; }
+                if let Some(event) = event {
+                    match event {
+                        PlayerEvent::Paused(value) => paused = value,
+                        PlayerEvent::Buffering(value) => buffering = value,
+                        _ => {}
+                    }
+                    let _ = events.send((generation, event)).await;
+                }
+            }
+            _ = meter_tick.tick(), if meter_enabled && started && !paused && !buffering && meter_request.is_none() => {
+                meter_request = Some(session.command(json!(["get_property", "af-metadata/meter"])).await?);
             }
             _ = watchdog.tick() => {
                 if !started && tokio::time::Instant::now() >= deadline { bail!("Stream did not start within 30 seconds"); }
@@ -225,6 +265,18 @@ async fn session(
             }
         }
     }
+}
+
+fn audio_level(value: &Value) -> Option<f32> {
+    if value["error"] != "success" {
+        return None;
+    }
+    let db = value["data"]["lavfi.astats.Overall.RMS_level"]
+        .as_str()?
+        .parse::<f32>()
+        .ok()?;
+    // FFmpeg reports -inf for digital silence; other non-finite values aren't levels.
+    (db.is_finite() || db == f32::NEG_INFINITY).then_some(db)
 }
 
 fn property_event(value: &Value) -> Option<PlayerEvent> {
@@ -260,6 +312,19 @@ mod tests {
             matches!(property_event(&json!({"name":"metadata", "data":{"icy-title":"Artist — Track"}})), Some(PlayerEvent::Metadata(s)) if s == "Artist — Track")
         );
     }
+    #[test]
+    fn parses_rms_and_silence_and_ignores_unavailable_meter_metadata() {
+        let response =
+            |level| json!({"error": "success", "data": {"lavfi.astats.Overall.RMS_level": level}});
+        assert_eq!(audio_level(&response("-21.5")), Some(-21.5));
+        assert_eq!(audio_level(&response("-inf")), Some(f32::NEG_INFINITY));
+        for level in ["", "NaN", "inf", "not a number"] {
+            assert_eq!(audio_level(&response(level)), None);
+        }
+        assert_eq!(audio_level(&json!({"error": "property unavailable"})), None);
+        assert_eq!(audio_level(&json!({"error": "success", "data": {}})), None);
+    }
+
     #[tokio::test]
     async fn missing_mpv_reports_actionable_error() {
         let (tx, mut rx) = mpsc::channel(8);
@@ -268,8 +333,11 @@ mod tests {
             "/no/such/mpv".into(),
             "https://example.com/live".into(),
             7,
-            70,
-            false,
+            PlaybackOptions {
+                volume: 70,
+                muted: false,
+                audio_meter: true,
+            },
             tx,
         );
         let (generation, event) = rx.recv().await.unwrap();
