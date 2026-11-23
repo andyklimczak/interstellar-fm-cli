@@ -62,7 +62,7 @@ Always show Saved / History / Search as top tabs, with a full-width station tabl
 │ > ★ Jazz Radio            FR         128 kbps    12k    68k   │
 │     Jazz24                US         128 kbps   4.3k    23k   │
 ├───────────────────────────────────────────────────────────────┤
-│ ▅ ▄ ▂    Jazz Radio · Artist — Track, when available           │
+│ ▅▄▂      Jazz Radio · Artist — Track, when available           │
 │ LIVE · MP3 128 kbps                     Volume: 70%            │
 └───────────────────────────────────────────────────────────────┘
 ```

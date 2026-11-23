@@ -99,7 +99,7 @@ fn playback_indicator(app: &App) -> Span<'static> {
             let label = match app.audio_level {
                 Some(AudioMeter::Bands(levels)) => {
                     let [bass, mids, treble] = levels.map(band_bar);
-                    bands = format!("{bass} {mids} {treble}");
+                    bands = format!("{bass}{mids}{treble}");
                     bands.as_str()
                 }
                 Some(AudioMeter::Loudness(db)) => {
@@ -494,9 +494,9 @@ mod tests {
             (Some(Loudness(-40.0)), "▂····"),
             (Some(Loudness(-20.0)), "▂▄▅··"),
             (Some(Loudness(-8.0)), "▂▄▅▆█"),
-            (Some(Bands([-10.0, f32::NEG_INFINITY, -32.0])), "█ · ▄"),
-            (Some(Bands([-32.0, -10.0, f32::NEG_INFINITY])), "▄ █ ·"),
-            (Some(Bands([f32::NEG_INFINITY, -32.0, -10.0])), "· ▄ █"),
+            (Some(Bands([-10.0, f32::NEG_INFINITY, -32.0])), "█·▄"),
+            (Some(Bands([-32.0, -10.0, f32::NEG_INFINITY])), "▄█·"),
+            (Some(Bands([f32::NEG_INFINITY, -32.0, -10.0])), "·▄█"),
         ] {
             app.audio_level = level;
             let indicator = playback_indicator(&app);

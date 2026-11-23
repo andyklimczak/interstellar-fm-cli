@@ -145,7 +145,7 @@ def main():
                         key("Down")
                     key("Return")
                     try:
-                        wait_for(lambda text: re.search(r"[·▁▂▃▄▅▆▇█] [·▁▂▃▄▅▆▇█] [·▁▂▃▄▅▆▇█]", text) and len(json.loads(library.read_text())["history"]) > before, "stream playback", timeout=25)
+                        wait_for(lambda text: re.search(r"[·▁▂▃▄▅▆▇█]{3}", text) and len(json.loads(library.read_text())["history"]) > before, "stream playback", timeout=25)
                     except RuntimeError as error:
                         print(f"Skipping unavailable stream: {favorites[index]['name']} ({error.args[0].splitlines()[0]})")
                     if len(json.loads(library.read_text())["history"]) >= 3:
