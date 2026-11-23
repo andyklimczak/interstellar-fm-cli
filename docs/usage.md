@@ -2,7 +2,8 @@
 
 ## Discovery and navigation
 
-- Saved, History, and Search always appear as tabs at the top, with the station list using the full width.
+- Saved, History, and Search always appear as tabs at the top, with the station list using the full width. The table title shows the visible station count.
+- Press `?` to open controls; the `? help` hint is at the top right. There is no routine footer; errors and action feedback appear in a status line only when present.
 - `1`, `2`, `3` open Saved, History, and Search. Left/Right or `h`/`l` switch tabs (wrapping at either end).
 - Tab/Shift-Tab switch tabs/list focus. When the tabs are focused, the active tab is underlined; Enter or Down returns to the list without playing.
 - Move through stations with Up/Down or `j`/`k`; Home/End or `gg`/`G` jump to the first/last row.
@@ -90,7 +91,7 @@ remove = ["d", "delete"]
 ```
 
 Overrides replace an action's defaults; unknown settings/conflicting keys are errors.
-Help and the footer reflect navigation overrides. Dialog/text-field controls are fixed;
+Help and the top-right help hint reflect navigation overrides. Dialog/text-field controls are fixed;
 `gg` and Ctrl-c are reserved. `$XDG_CONFIG_HOME` is respected.
 
 The atomic library snapshot is at

@@ -127,6 +127,8 @@ def main():
 
                 def capture(name):
                     text = screen()
+                    if "? help" not in text.splitlines()[0]:
+                        raise RuntimeError("Expected the top-right help hint; rebuild the release binary before capturing")
                     if not any(all(label in line for label in ["1 Saved", "2 History", "3 Search"]) for line in text.splitlines()[:3]):
                         raise RuntimeError("Expected top navigation tabs; rebuild the release binary before capturing")
                     time.sleep(0.3)
@@ -157,7 +159,7 @@ def main():
                 key("3", "slash")
                 xdo("type", "--clearmodifiers", "--delay", "60", "jazz")
                 key("Tab")
-                wait_for(lambda text: "jazz" in text and re.search(r"[1-9][0-9]* stations", text) and "searching" not in text, "live search results")
+                wait_for(lambda text: "jazz" in text and re.search(r"Search \([1-9][0-9]*\)", text) and "searching" not in text, "live search results")
                 capture("search")
                 key("q")
                 terminal.wait(timeout=5)

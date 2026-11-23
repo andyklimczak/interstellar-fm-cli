@@ -98,10 +98,22 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Constraint::Length(1),
         Constraint::Min(3),
         Constraint::Length(4),
-        Constraint::Length(2),
+        Constraint::Length(u16::from(!app.message.is_empty())),
     ])
     .split(size);
     let color = accent(app);
+    let help = Line::from(format!("{} help ", app.keymap.hint("help")));
+    let header = Layout::horizontal([
+        Constraint::Min(0),
+        Constraint::Length(help.width().min(size.width as usize) as u16),
+    ])
+    .split(rows[0]);
+    frame.render_widget(
+        Paragraph::new(help)
+            .alignment(Alignment::Right)
+            .style(Style::default().fg(color)),
+        header[1],
+    );
     frame.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(
@@ -110,7 +122,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             ),
             Span::raw(" · radio from the universe via the internet"),
         ])),
-        rows[0],
+        header[0],
     );
     let content = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(rows[1]);
     let tab_highlight = Style::default().fg(color).add_modifier(Modifier::BOLD);
@@ -188,10 +200,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         widths.push(Constraint::Length(7));
     }
     let title = if app.section == Section::Search && app.query.trim().chars().count() < 2 {
-        " Discover stations "
+        "Discover stations"
     } else {
         app.section.title()
     };
+    let title = format!(" {title} ({}) ", stations.len());
     let table = Table::new(rows_data, widths)
         .header(
             Row::new(headers)
@@ -199,7 +212,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                 .bottom_margin(1),
         )
         .block(panel(
-            title,
+            &title,
             if !app.tabs_focus && matches!(app.mode, Mode::Normal) {
                 color
             } else {
@@ -262,24 +275,12 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Paragraph::new(player).block(panel(" Player ", Color::DarkGray)),
         rows[2],
     );
-    frame.render_widget(
-        Paragraph::new(vec![
-            Line::from(Span::styled(
-                clean(&app.message),
-                Style::default().fg(color),
-            )),
-            Line::from(format!(
-                "{} play · {} favorite · {} add · {} search · {} help · {} quit",
-                app.keymap.hint("play"),
-                app.keymap.hint("favorite"),
-                app.keymap.hint("add"),
-                app.keymap.hint("filter"),
-                app.keymap.hint("help"),
-                app.keymap.hint("quit")
-            )),
-        ]),
-        rows[3],
-    );
+    if !app.message.is_empty() {
+        frame.render_widget(
+            Paragraph::new(clean(&app.message)).style(Style::default().fg(color)),
+            rows[3],
+        );
+    }
     match &app.mode {
         Mode::Help => {
             let area = popup(frame, 78, 34, " Controls · j/k scroll · Esc close ", color);
@@ -584,6 +585,56 @@ mod tests {
             );
             assert!(!buffer[(history, 1)].modifier.contains(Modifier::UNDERLINED));
         }
+    }
+
+    #[test]
+    fn help_hint_stays_at_the_top_right_even_on_narrow_terminals_and_uses_the_keymap() {
+        for (binding, hint) in [("?", "? help "), ("H", "H help ")] {
+            let mut config = crate::config::Config::default();
+            config
+                .keybindings
+                .insert("help".into(), vec![binding.into()]);
+            let mut app = App::new(config, crate::model::Library::default());
+            for width in [36, 60, 120] {
+                let mut terminal = Terminal::new(TestBackend::new(width, 35)).unwrap();
+                terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+                let buffer = terminal.backend().buffer();
+                let header: String = (0..width).map(|x| buffer[(x, 0)].symbol()).collect();
+                assert!(
+                    header.ends_with(hint),
+                    "wrong help hint at width {width}: {header}"
+                );
+                assert!(header.contains("INTERSTELLAR FM"));
+            }
+        }
+    }
+
+    #[test]
+    fn routine_footer_is_gone_but_action_feedback_and_errors_stay_visible() {
+        let mut app = App::new(
+            crate::config::Config::default(),
+            crate::model::Library::default(),
+        );
+        for message in ["", "Saved Jazz radio", "Could not save library"] {
+            app.message = message.into();
+            let mut terminal = Terminal::new(TestBackend::new(120, 35)).unwrap();
+            terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+            let buffer = terminal.backend().buffer();
+            let bottom: String = (0..120).map(|x| buffer[(x, 34)].symbol()).collect();
+            if message.is_empty() {
+                assert_eq!(buffer[(0, 34)].symbol(), "└", "player uses the last row");
+            } else {
+                assert!(bottom.contains(message));
+            }
+            let text: String = buffer.content.iter().map(|cell| cell.symbol()).collect();
+            assert!(!text.contains("enter play"));
+            assert!(!text.contains("f favorite"));
+            assert!(!text.contains("Welcome!"));
+        }
+        app.section = Section::Search;
+        app.query = "jazz".into();
+        app.message.clear();
+        assert!(screen(&mut app, 120).contains("Search (0)"));
     }
 
     #[test]

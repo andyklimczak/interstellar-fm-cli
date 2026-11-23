@@ -54,7 +54,7 @@ Do not bring over album browsing, queues, shuffle, repeat, seeking, scrobbling, 
 Always show Saved / History / Search as top tabs, with a full-width station table below. The three sections remain visible and one section's content is active at a time; there is no sidebar, even on wide terminals.
 
 ```text
-┌ Interstellar FM ──────────────────────────────────────────────┐
+┌ Interstellar FM ─────────────────────────────────── ? help ───┐
 │ 1 Saved | 2 History | 3 Search                                │
 ├───────────────────────────────────────────────────────────────┤
 │ Search: jazz                                  Sort: Votes     │
@@ -64,8 +64,6 @@ Always show Saved / History / Search as top tabs, with a full-width station tabl
 ├───────────────────────────────────────────────────────────────┤
 │ PLAYING  Jazz Radio · Artist — Track, when available           │
 │ LIVE · MP3 128 kbps                     Volume: 70%            │
-├───────────────────────────────────────────────────────────────┤
-│ Enter play · f save · p pause · / search · ? help · q quit      │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -75,7 +73,7 @@ Always show Saved / History / Search as top tabs, with a full-width station tabl
 - Preserve each section's selection and scroll position independently.
 - Search input and sort controls appear in Search; Saved/History can have a local filter instead.
 - Bottom player: station, playback/buffering/error state, available ICY metadata, live indicator, volume, and mute state. Do not show a misleading track progress bar.
-- Context-sensitive footer and a help overlay generated from the active keymap.
+- No routine footer: a top-right help hint and a help overlay generated from the active keymap. Show station counts in table titles; only reserve a status line when there is an error or action feedback.
 - Station details popup: country, language, votes/clicks, tags, homepage, codec, bitrate, and stream URL.
 - At narrow widths, retain the top tabs and drop lower-priority table columns. At very small sizes, show a resize message without panicking.
 - Loading, empty, offline, and error states should explain what happened and how to retry.

@@ -130,7 +130,7 @@ impl App {
             search_generation: 0,
             import_generation: 0,
             search_due: None,
-            message: "Welcome! 3 search · a add stream / .pls · ? help".into(),
+            message: String::new(),
             current: None,
             playback: "IDLE".into(),
             metadata: String::new(),
@@ -218,7 +218,7 @@ impl App {
                 }
                 self.results = stations;
                 self.tables[2].select(Some(0));
-                self.message = format!("{} stations · Enter play · f favorite", self.results.len());
+                self.message.clear();
             }
             Err(error) => {
                 self.message = clean(&error);
@@ -233,6 +233,7 @@ impl App {
             form.busy = false;
             match result {
                 Ok(entries) => {
+                    self.message.clear();
                     let mut selected = vec![false; entries.len()];
                     if selected.len() == 1 {
                         selected[0] = true;
@@ -297,6 +298,7 @@ impl App {
             Mode::Add(mut form) => {
                 if key.code == KeyCode::Esc {
                     self.import_generation += 1;
+                    self.message.clear();
                     return vec![];
                 }
                 let mut effects = vec![];
@@ -334,7 +336,7 @@ impl App {
             }
             Mode::Import(mut preview) => {
                 match key.code {
-                    KeyCode::Esc => {}
+                    KeyCode::Esc => self.message.clear(),
                     KeyCode::Up | KeyCode::Char('k') => {
                         preview.cursor = preview.cursor.saturating_sub(1);
                         self.mode = Mode::Import(preview);
@@ -499,7 +501,7 @@ impl App {
             KeyCode::Char('a') => {
                 self.import_generation += 1;
                 self.mode = Mode::Add(AddForm::default());
-                self.message = "Paste a stream URL, .pls URL, or local .pls path".into();
+                self.message.clear();
             }
             KeyCode::Char('p' | ' ') => return vec![Effect::Pause],
             KeyCode::Char('s') => return vec![Effect::Stop],
@@ -780,6 +782,40 @@ mod tests {
             app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn import_progress_and_validation_do_not_leave_stale_footer_messages() {
+        let mut app = App::new(Config::default(), Library::default());
+        app.key(key('a'));
+        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(!app.message.is_empty());
+        app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert!(app.message.is_empty());
+        app.key(key('a'));
+        app.paste("https://example.com/live");
+        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert_eq!(app.message, "Reading source…");
+        let station = Station::custom(
+            url::Url::parse("https://example.com/live").unwrap(),
+            "Jazz",
+            None,
+        );
+        app.import_result(app.import_generation, Ok(vec![station]));
+        assert!(app.message.is_empty());
+        app.message = "Select streams with Space".into();
+        app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert!(app.message.is_empty());
+    }
+
+    #[test]
+    fn startup_and_successful_search_have_no_routine_footer_message() {
+        let mut app = App::new(Config::default(), Library::default());
+        assert!(app.message.is_empty());
+        app.search_result(0, Err("Radio Browser unavailable".into()));
+        assert_eq!(app.message, "Radio Browser unavailable");
+        app.search_result(0, Ok(vec![]));
+        assert!(app.message.is_empty());
     }
 
     #[test]
