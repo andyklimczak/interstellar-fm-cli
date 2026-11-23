@@ -246,7 +246,7 @@ struct RadioStation {
     name: Option<String>,
     url: Option<String>,
     url_resolved: Option<String>,
-    country: Option<String>,
+    countrycode: Option<String>,
     codec: Option<String>,
     bitrate: Option<u32>,
     votes: Option<u64>,
@@ -263,11 +263,23 @@ impl RadioStation {
             .url_resolved
             .and_then(|u| stream_url(&u).ok())
             .or_else(|| self.url.and_then(|u| stream_url(&u).ok()))?;
+        let country_code = self
+            .countrycode
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_uppercase();
+        let country_code =
+            if country_code.len() == 2 && country_code.bytes().all(|b| b.is_ascii_alphabetic()) {
+                country_code
+            } else {
+                String::new()
+            };
         Some(Station {
             id: StationId::RadioBrowser(id),
             name: clean(&self.name.unwrap_or_else(|| "Unnamed station".into())),
             url: url.into(),
-            country: self.country.unwrap_or_default(),
+            country_code,
+            legacy_country: String::new(),
             codec: self.codec.unwrap_or_default(),
             bitrate: self.bitrate.unwrap_or_default(),
             votes: self.votes,
@@ -378,6 +390,36 @@ mod tests {
         assert_eq!(s.url, "http://example.com/live");
         assert_eq!(s.bitrate, 0);
         assert_eq!((s.votes, s.clicks), (None, None));
+    }
+
+    #[test]
+    fn uses_normalized_countrycode_and_never_the_deprecated_country_field() {
+        for (code, expected) in [
+            (serde_json::json!("US"), "US"),
+            (serde_json::json!(" de "), "DE"),
+            (serde_json::json!(null), ""),
+            (serde_json::json!(""), ""),
+            (serde_json::json!("USA"), ""),
+            (serde_json::json!("1A"), ""),
+            (serde_json::json!("é"), ""),
+        ] {
+            let mut value = serde_json::json!({
+                "stationuuid": "abc", "url": "https://example.com/live",
+                "countrycode": code, "country": "Do not use this deprecated name"
+            });
+            let station = serde_json::from_value::<RadioStation>(value.clone())
+                .unwrap()
+                .normalize()
+                .unwrap();
+            assert_eq!(station.country_code, expected);
+            assert!(station.legacy_country.is_empty());
+            value.as_object_mut().unwrap().remove("countrycode");
+            let missing = serde_json::from_value::<RadioStation>(value)
+                .unwrap()
+                .normalize()
+                .unwrap();
+            assert_eq!(missing.country(), "—");
+        }
     }
 
     #[test]
@@ -505,5 +547,7 @@ mod tests {
         let stations = radio.search("jazz", Sort::default(), false).await.unwrap();
         assert!(!stations.is_empty());
         assert!(stations.iter().all(|s| stream_url(&s.url).is_ok()));
+        assert!(stations.iter().any(|s| !s.country_code.is_empty()));
+        assert!(stations.iter().all(|s| s.legacy_country.is_empty()));
     }
 }

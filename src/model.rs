@@ -15,8 +15,15 @@ pub struct Station {
     pub id: StationId,
     pub name: String,
     pub url: String,
-    #[serde(default)]
-    pub country: String,
+    #[serde(
+        default,
+        rename = "countrycode",
+        skip_serializing_if = "String::is_empty"
+    )]
+    pub country_code: String,
+    // Read old library snapshots without relying on the deprecated API field.
+    #[serde(default, rename = "country", skip_serializing_if = "String::is_empty")]
+    pub legacy_country: String,
     #[serde(default)]
     pub codec: String,
     #[serde(default)]
@@ -46,7 +53,8 @@ impl Station {
             id: StationId::Custom(Uuid::new_v4()),
             name,
             url: url.to_string(),
-            country: String::new(),
+            country_code: String::new(),
+            legacy_country: String::new(),
             codec: String::new(),
             bitrate: 0,
             votes: None,
@@ -58,8 +66,18 @@ impl Station {
         }
     }
 
-    /// Keep directory statistics current without changing saved names or identity.
-    pub fn update_counts_from(&mut self, station: &Self) -> bool {
+    pub fn country(&self) -> &str {
+        if !self.country_code.is_empty() {
+            &self.country_code
+        } else if !self.legacy_country.is_empty() {
+            &self.legacy_country
+        } else {
+            "—"
+        }
+    }
+
+    /// Refresh directory counts/country code without changing saved names or identity.
+    pub fn update_metadata_from(&mut self, station: &Self) -> bool {
         if self.id != station.id {
             return false;
         }
@@ -70,7 +88,13 @@ impl Station {
         if station.clicks.is_some() {
             self.clicks = station.clicks;
         }
-        previous != (self.votes, self.clicks)
+        let mut changed = previous != (self.votes, self.clicks);
+        if !station.country_code.is_empty() {
+            changed |= self.country_code != station.country_code || !self.legacy_country.is_empty();
+            self.country_code.clone_from(&station.country_code);
+            self.legacy_country.clear();
+        }
+        changed
     }
 }
 
@@ -237,20 +261,57 @@ mod tests {
     }
 
     #[test]
-    fn count_updates_preserve_identity_name_and_known_values() {
+    fn metadata_updates_preserve_identity_name_and_known_values() {
         let mut saved = station("live");
         let mut fresh = saved.clone();
         fresh.name = "Updated directory name".into();
         fresh.votes = Some(0);
         fresh.clicks = Some(12345);
-        assert!(saved.update_counts_from(&fresh));
+        fresh.country_code = "DE".into();
+        saved.legacy_country = "Germany".into();
+        assert!(saved.update_metadata_from(&fresh));
+        assert_eq!(saved.country(), "DE");
+        assert!(saved.legacy_country.is_empty());
         assert_eq!(saved.name, "live");
         assert_eq!((saved.votes, saved.clicks), (Some(0), Some(12345)));
-        assert!(!saved.update_counts_from(&station("other")));
+        assert!(!saved.update_metadata_from(&station("other")));
         fresh.votes = None;
         fresh.clicks = None;
-        assert!(!saved.update_counts_from(&fresh));
+        fresh.country_code.clear();
+        assert!(!saved.update_metadata_from(&fresh));
+        assert_eq!(saved.country(), "DE");
         assert_eq!((saved.votes, saved.clicks), (Some(0), Some(12345)));
+    }
+
+    #[test]
+    fn country_only_refresh_marks_a_snapshot_changed_and_is_idempotent() {
+        let mut saved = station("live");
+        saved.legacy_country = "Germany".into();
+        let mut fresh = saved.clone();
+        fresh.country_code = "DE".into();
+        fresh.legacy_country.clear();
+        assert!(saved.update_metadata_from(&fresh));
+        assert_eq!(saved.country(), "DE");
+        assert!(saved.legacy_country.is_empty());
+        assert!(!saved.update_metadata_from(&fresh));
+    }
+
+    #[test]
+    fn old_country_snapshots_still_load_and_country_codes_take_precedence() {
+        let mut value = serde_json::to_value(station("live")).unwrap();
+        value["country"] = "Germany".into();
+        let legacy: Station = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(legacy.country(), "Germany");
+        assert!(legacy.country_code.is_empty());
+        value["countrycode"] = "DE".into();
+        let loaded: Station = serde_json::from_value(value).unwrap();
+        assert_eq!(loaded.country(), "DE");
+        let mut current = station("live");
+        assert_eq!(current.country(), "—");
+        current.country_code = "GB".into();
+        let value = serde_json::to_value(current).unwrap();
+        assert_eq!(value["countrycode"], "GB");
+        assert!(value.get("country").is_none());
     }
 
     #[test]

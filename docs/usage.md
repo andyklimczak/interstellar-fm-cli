@@ -20,6 +20,11 @@ The table uses rounded compact counts: `23,059` → `23k`, `2,300` → `2.3k`, a
 unknown bitrates display as `—`. Press `i` for exact counts and codec/bitrate details.
 Narrow terminals prioritize Votes and hide Clicks/country when needed.
 
+Countries use Radio Browser's ISO 3166-1 alpha-2 `countrycode` (e.g. `US`, `DE`),
+not the deprecated `country` field. Local filters match those codes. Older Saved/History
+entries retain their stored country names until matching search results refresh them
+with a code. Unknown countries display as `—`.
+
 ## Favorites and History
 
 `f` toggles the selected favorite from any section. In Saved, `d` removes a favorite

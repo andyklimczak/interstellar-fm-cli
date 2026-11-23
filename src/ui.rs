@@ -174,7 +174,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             );
             let mut cells = vec![Cell::from(mark), Cell::from(clean(&s.name))];
             if main.width >= 70 {
-                cells.push(Cell::from(clean(&s.country)));
+                cells.push(Cell::from(clean(s.country())));
             }
             if main.width >= 85 {
                 cells.push(right(if s.bitrate == 0 {
@@ -198,7 +198,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     let mut widths = vec![Constraint::Length(2), Constraint::Min(10)];
     if main.width >= 70 {
         headers.push(Cell::from("Country"));
-        widths.push(Constraint::Length(17));
+        // Old snapshots can still contain full names until a directory refresh.
+        let legacy_names = stations
+            .iter()
+            .any(|s| s.country_code.is_empty() && !s.legacy_country.is_empty());
+        widths.push(Constraint::Length(if legacy_names { 17 } else { 7 }));
     }
     if main.width >= 85 {
         headers.push(right("Bitrate".into()));
@@ -317,7 +321,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                 "{}\n{}\n\nCountry: {}\nLanguage: {}\nVotes: {} · Clicks: {}\nCodec: {} · {} kbps\nTags: {}\nHomepage: {}\nStream: {}\nPlaylist: {}",
                 s.name,
                 source,
-                s.country,
+                s.country(),
                 s.language,
                 exact_count(s.votes),
                 exact_count(s.clicks),
@@ -525,6 +529,31 @@ mod tests {
     }
 
     #[test]
+    fn country_column_and_details_use_the_country_code() {
+        let mut app = App::new(
+            crate::config::Config::default(),
+            crate::model::Library::default(),
+        );
+        let mut station = crate::model::Station::custom(
+            url::Url::parse("https://example.com/live").unwrap(),
+            "Radio",
+            None,
+        );
+        station.country_code = "US".into();
+        station.legacy_country = "Deprecated country name".into();
+        app.library.add(station.clone());
+        let table = screen(&mut app, 120);
+        assert!(table.contains("Country"));
+        assert!(table.contains("US"));
+        assert!(!table.contains("Deprecated"));
+        app.library.favorites[0].country_code.clear();
+        app.library.favorites[0].legacy_country = "The United States".into();
+        assert!(screen(&mut app, 120).contains("The United States"));
+        app.mode = Mode::Details(station);
+        assert!(screen(&mut app, 120).contains("Country: US"));
+    }
+
+    #[test]
     fn custom_streams_show_unknown_bitrate_and_counts_instead_of_zero() {
         let mut app = App::new(
             crate::config::Config::default(),
@@ -540,7 +569,7 @@ mod tests {
         assert!(text.contains("Clicks"));
         assert!(text.contains("Bitrate"));
         assert!(!text.contains("0 kbps"));
-        assert_eq!(text.matches('—').count(), 3);
+        assert_eq!(text.matches('—').count(), 4);
     }
 
     #[test]

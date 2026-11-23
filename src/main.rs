@@ -133,7 +133,7 @@ impl Engine {
                 self.cancel_retry();
                 self.recorded = false;
                 self.retries = 0;
-                app.current = Some(station);
+                app.current = Some(*station);
                 self.start(app);
             }
             Effect::Stop => {
@@ -260,14 +260,14 @@ impl Engine {
                     for saved in &mut app.library.favorites {
                         if saved.id == station.id {
                             saved.url = station.url.clone();
-                            saved.update_counts_from(&station);
+                            saved.update_metadata_from(&station);
                             app.dirty = true;
                         }
                     }
                     for entry in &mut app.library.history {
                         if entry.station.id == station.id {
                             entry.station.url = station.url.clone();
-                            entry.station.update_counts_from(&station);
+                            entry.station.update_metadata_from(&station);
                             app.dirty = true;
                         }
                     }

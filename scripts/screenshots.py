@@ -31,7 +31,7 @@ def stations(query, limit):
     return [{
         "id": {"source": "radio_browser", "id": row["stationuuid"]},
         "name": row["name"], "url": row.get("url_resolved") or row["url"],
-        "country": row.get("country") or "", "codec": row.get("codec") or "",
+        "countrycode": row.get("countrycode") or "", "codec": row.get("codec") or "",
         "bitrate": row.get("bitrate") or 0, "votes": row.get("votes"),
         "clicks": row.get("clickcount"), "tags": row.get("tags") or "",
         "language": row.get("language") or "", "homepage": row.get("homepage") or "",

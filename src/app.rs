@@ -72,7 +72,7 @@ pub enum Effect {
         source: String,
         name: String,
     },
-    Play(Station),
+    Play(Box<Station>),
     Stop,
     Pause,
     Volume(u8),
@@ -154,7 +154,7 @@ impl App {
         entries
             .into_iter()
             .filter(|s| {
-                format!("{} {} {}", s.name, s.country, s.tags)
+                format!("{} {} {}", s.name, s.country(), s.tags)
                     .to_lowercase()
                     .contains(&filter)
             })
@@ -207,13 +207,13 @@ impl App {
             Ok(stations) => {
                 for station in &stations {
                     for saved in &mut self.library.favorites {
-                        self.dirty |= saved.update_counts_from(station);
+                        self.dirty |= saved.update_metadata_from(station);
                     }
                     for entry in &mut self.library.history {
-                        self.dirty |= entry.station.update_counts_from(station);
+                        self.dirty |= entry.station.update_metadata_from(station);
                     }
                     if let Some(current) = &mut self.current {
-                        current.update_counts_from(station);
+                        current.update_metadata_from(station);
                     }
                 }
                 self.results = stations;
@@ -392,7 +392,7 @@ impl App {
                                     .find(|s| crate::model::same_url(&s.url, &chosen.url))
                                     .cloned()
                                     .unwrap_or_else(|| chosen.clone());
-                                return vec![Effect::Play(station)];
+                                return vec![Effect::Play(Box::new(station))];
                             }
                         }
                     }
@@ -489,7 +489,7 @@ impl App {
             KeyCode::Enter if self.tabs_focus => self.tabs_focus = false,
             KeyCode::Enter => {
                 if let Some(s) = self.selected() {
-                    return vec![Effect::Play(s)];
+                    return vec![Effect::Play(Box::new(s))];
                 }
             }
             KeyCode::Char('f') => self.toggle_favorite(),
@@ -617,7 +617,7 @@ mod tests {
     }
 
     #[test]
-    fn search_refreshes_saved_and_history_counts_without_changing_names() {
+    fn search_refreshes_saved_and_history_metadata_without_changing_names() {
         let mut app = App::new(Config::default(), Library::default());
         let mut station = Station::custom(
             url::Url::parse("https://example.com/live").unwrap(),
@@ -625,12 +625,15 @@ mod tests {
             None,
         );
         station.id = crate::model::StationId::RadioBrowser("abc".into());
+        station.legacy_country = "Germany".into();
         app.library.add(station.clone());
         app.library.record(station.clone(), 30);
         app.current = Some(station.clone());
         station.name = "Directory name".into();
         station.votes = Some(123);
         station.clicks = Some(456);
+        station.country_code = "DE".into();
+        station.legacy_country.clear();
         app.search_result(0, Ok(vec![station]));
         assert!(app.dirty);
         for saved in [
@@ -640,8 +643,35 @@ mod tests {
         ] {
             assert_eq!((saved.votes, saved.clicks), (Some(123), Some(456)));
             assert_eq!(saved.name, "My favorite");
+            assert_eq!(saved.country(), "DE");
+            assert!(saved.legacy_country.is_empty());
         }
         assert_eq!(app.library.history.len(), 1);
+    }
+
+    #[test]
+    fn local_filters_match_country_codes_and_legacy_country_names() {
+        let mut app = App::new(Config::default(), Library::default());
+        let mut station = Station::custom(
+            url::Url::parse("https://example.com/live").unwrap(),
+            "Radio",
+            None,
+        );
+        station.country_code = "GB".into();
+        app.library.add(station.clone());
+        app.library.record(station, 30);
+        for section in [Section::Saved, Section::History] {
+            app.section = section;
+            app.filters[section.index()] = "gb".into();
+            assert_eq!(app.visible().len(), 1);
+            app.filters[section.index()] = "de".into();
+            assert!(app.visible().is_empty());
+        }
+        app.section = Section::Saved;
+        app.library.favorites[0].country_code.clear();
+        app.library.favorites[0].legacy_country = "Germany".into();
+        app.filters[0] = "germany".into();
+        assert_eq!(app.visible().len(), 1);
     }
 
     #[test]
