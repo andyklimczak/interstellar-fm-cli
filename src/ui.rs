@@ -287,7 +287,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         )),
     ];
     frame.render_widget(
-        Paragraph::new(player).block(panel(" Player ", Color::DarkGray)),
+        Paragraph::new(player).block(panel(" Now Playing ", Color::DarkGray)),
         rows[2],
     );
     if !app.message.is_empty() {
@@ -678,6 +678,7 @@ mod tests {
             assert!(!text.contains("enter play"));
             assert!(!text.contains("f favorite"));
             assert!(!text.contains("Welcome!"));
+            assert!(text.contains("Now Playing"));
         }
         app.section = Section::Search;
         app.query = "jazz".into();
