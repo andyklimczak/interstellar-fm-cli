@@ -180,6 +180,24 @@ impl App {
     pub fn clamp(&mut self) {
         self.move_row(0);
     }
+    pub fn record_playback(&mut self, station: Station) {
+        // History is reordered on successful playback, so keep the cursor on
+        // the same station rather than the same row.
+        let selected_id = if self.section == Section::History {
+            self.selected().map(|station| station.id)
+        } else {
+            None
+        };
+        self.library.record(station, self.config.history_limit);
+        if let Some(id) = selected_id {
+            if let Some(row) = self.visible().iter().position(|station| station.id == id) {
+                self.tables[Section::History.index()].select(Some(row));
+            } else {
+                self.clamp();
+            }
+        }
+        self.dirty = true;
+    }
     pub fn set_section(&mut self, section: Section) -> Vec<Effect> {
         self.section = section;
         self.last_g = None;

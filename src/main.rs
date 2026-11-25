@@ -201,15 +201,13 @@ impl Engine {
                 app.paused = false;
                 if !self.recorded {
                     self.recorded = true;
-                    if let Some(station) = &app.current {
-                        app.library
-                            .record(station.clone(), app.config.history_limit);
-                        app.dirty = true;
-                        if let StationId::RadioBrowser(id) = &station.id
+                    if let Some(station) = app.current.clone() {
+                        let id = station.id.clone();
+                        app.record_playback(station);
+                        if let StationId::RadioBrowser(id) = id
                             && !self.offline
                         {
                             let radio = self.radio.clone();
-                            let id = id.clone();
                             tokio::spawn(async move {
                                 radio.click(&id).await;
                             });

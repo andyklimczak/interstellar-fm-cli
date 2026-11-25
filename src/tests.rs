@@ -85,6 +85,51 @@ fn only_successful_current_attempt_records_history() {
 }
 
 #[test]
+fn history_cursor_follows_the_played_station_to_the_top_of_filtered_results() {
+    let (mut engine, mut app, station) = fixture();
+    let newer_station = |name: &str| {
+        Station::custom(
+            playlist::stream_url("https://example.com/other").unwrap(),
+            name,
+            None,
+        )
+    };
+    app.library.record(station.clone(), 30);
+    app.library.record(newer_station("Newer radio"), 30);
+    app.library.record(newer_station("Hidden station"), 30);
+    app.section = app::Section::History;
+    let history = app.section.index();
+    app.filters[history] = "radio".into();
+    app.tables[history].select(Some(1));
+    assert_eq!(app.selected().unwrap().id, station.id);
+
+    engine.player_event(&mut app, 4, PlayerEvent::Started);
+    engine.player_event(&mut app, 4, PlayerEvent::Paused(true));
+
+    assert_eq!(app.library.history[0].station.id, station.id);
+    assert_eq!(app.tables[history].selected(), Some(0));
+    let effects = app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(matches!(effects.as_slice(), [Effect::Play(s)] if s.id == station.id));
+}
+
+#[test]
+fn history_cursor_stays_on_a_different_station_if_moved_while_connecting() {
+    let (mut engine, mut app, station) = fixture();
+    let other = Station::custom(
+        playlist::stream_url("https://example.com/other").unwrap(),
+        "Newer station",
+        None,
+    );
+    app.library.record(station, 30);
+    app.library.record(other.clone(), 30);
+    app.section = app::Section::History;
+    assert_eq!(app.selected().unwrap().id, other.id);
+    engine.player_event(&mut app, 4, PlayerEvent::Started);
+    assert_eq!(app.tables[app.section.index()].selected(), Some(1));
+    assert_eq!(app.selected().unwrap().id, other.id);
+}
+
+#[test]
 fn stop_invalidates_late_events_and_pending_reconnects() {
     let (mut engine, mut app, _) = fixture();
     engine.player_event(&mut app, 4, PlayerEvent::Failed("connection lost".into()));
